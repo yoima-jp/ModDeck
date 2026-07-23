@@ -9,7 +9,7 @@
   "moddeck.saved": "保存しました",
   "moddeck.save_failed": "設定を保存できませんでした",
   "moddeck.subtitle": "統合Mod設定",
-  "moddeck.search": "Modを検索...",
+  "moddeck.search": "設定を検索...",
   "moddeck.installed": "インストール済みMod",
   "moddeck.change_key": "設定を開くキーを変更",
   "moddeck.theme.auto": "自動",
@@ -18,5 +18,14 @@
   "moddeck.theme.select": "テーマ",
   "moddeck.category.empty": "このカテゴリに設定はありません",
   "moddeck.reset_ready": "デフォルトに戻しました。保存してください",
-  "moddeck.saved_short": "保存済み"
+  "moddeck.saved_short": "保存済み",
+  "moddeck.unsaved": "未保存の変更があります",
+  "moddeck.requires_restart": "再起動が必要",
+  "moddeck.validation.invalid": "有効な値を入力してください",
+  "moddeck.keybind.press": "キーを押してください",
+  "moddeck.keybind.press_input": "キーまたはマウスボタンを押してください",
+  "moddeck.keybind.unbound": "未割り当て",
+  "moddeck.validation.fix_errors": "無効な値を修正してください",
+  "moddeck.confirm_save.title": "設定を保存しますか？",
+  "moddeck.confirm_save.message": "設定の変更を適用しますか？"
 }

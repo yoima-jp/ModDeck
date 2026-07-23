@@ -9,7 +9,7 @@
   "moddeck.saved": "Saved",
   "moddeck.save_failed": "Could not save settings",
   "moddeck.subtitle": "Unified mod settings",
-  "moddeck.search": "Search mods...",
+  "moddeck.search": "Search settings...",
   "moddeck.installed": "Installed mods",
   "moddeck.change_key": "Change open key",
   "moddeck.theme.auto": "Auto",
@@ -18,5 +18,14 @@
   "moddeck.theme.select": "Theme",
   "moddeck.category.empty": "No settings in this category",
   "moddeck.reset_ready": "Defaults restored — save to apply",
-  "moddeck.saved_short": "Saved"
+  "moddeck.saved_short": "Saved",
+  "moddeck.unsaved": "Unsaved changes",
+  "moddeck.requires_restart": "Requires restart",
+  "moddeck.validation.invalid": "Enter a valid value",
+  "moddeck.keybind.press": "Press a key",
+  "moddeck.keybind.press_input": "Press a key or mouse button",
+  "moddeck.keybind.unbound": "Unbound",
+  "moddeck.validation.fix_errors": "Fix invalid values before saving",
+  "moddeck.confirm_save.title": "Save settings?",
+  "moddeck.confirm_save.message": "Apply these configuration changes?"
 }

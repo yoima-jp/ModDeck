@@ -1,6 +1,7 @@
 package com.yoima.moddeck.api.option;
 
 import com.yoima.moddeck.api.OptionPresentation;
+import com.yoima.moddeck.api.ConfigText;
 import java.math.BigDecimal;
 
 public final class DoubleOption extends ConfigOption<Double> {
@@ -9,6 +10,18 @@ public final class DoubleOption extends ConfigOption<Double> {
     private final double step;
 
     public DoubleOption(String id, String name, String description, double defaultValue,
+                        double minimum, double maximum, double step) {
+        super(id, name, description, defaultValue, OptionPresentation.SLIDER);
+        if (!Double.isFinite(minimum) || !Double.isFinite(maximum) || !Double.isFinite(step)
+                || minimum > maximum || step <= 0 || defaultValue < minimum || defaultValue > maximum) {
+            throw new IllegalArgumentException("Invalid double range for " + id);
+        }
+        this.minimum = minimum;
+        this.maximum = maximum;
+        this.step = step;
+    }
+
+    public DoubleOption(String id, ConfigText name, ConfigText description, double defaultValue,
                         double minimum, double maximum, double step) {
         super(id, name, description, defaultValue, OptionPresentation.SLIDER);
         if (!Double.isFinite(minimum) || !Double.isFinite(maximum) || !Double.isFinite(step)

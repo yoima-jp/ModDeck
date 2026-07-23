@@ -14,14 +14,14 @@ public final class SwitchWidget extends AbstractWidget {
     private final Runnable onChanged;
 
     public SwitchWidget(int x, int y, BooleanOption option, Runnable onChanged) {
-        super(x, y, 34, 18, Component.literal(option.displayName()));
+        super(x, y, 34, 18, option.displayNameText().component());
         this.option = option;
         this.onChanged = onChanged;
+        active = option.editable();
     }
 
     @Override public void onClick(MouseButtonEvent event, boolean doubleClick) {
-        option.setValue(!option.value());
-        onChanged.run();
+        if (option.trySetValue(!option.value())) onChanged.run();
     }
 
     @Override protected void extractWidgetRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {

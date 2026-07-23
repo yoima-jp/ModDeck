@@ -39,4 +39,19 @@ public final class ConfigScreenApi {
     }
 
     public static Optional<ConfigStorage> storage() { return Optional.ofNullable(storage); }
+
+    public static ConfigRoute route(String modId) {
+        return ConfigRegistry.get(modId).orElseThrow(() -> new IllegalArgumentException(
+                "No Mod Deck config is registered for " + modId)).route();
+    }
+
+    /** Persists a definition and then invokes its screen- and option-level save callbacks. */
+    public static void save(ConfigDefinition definition) throws IOException {
+        Objects.requireNonNull(definition, "definition");
+        if (!definition.isValid()) throw new IllegalStateException("Cannot save a configuration with validation errors");
+        ConfigStorage currentStorage = storage;
+        if (currentStorage == null) throw new IOException("No ConfigStorage is installed");
+        currentStorage.save(definition);
+        definition.notifySaved();
+    }
 }

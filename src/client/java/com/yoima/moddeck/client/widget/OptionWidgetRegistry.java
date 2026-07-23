@@ -8,7 +8,7 @@ import net.minecraft.client.gui.components.AbstractWidget;
 /** Central renderer mapping keeps API option types independent from Minecraft widgets. */
 public final class OptionWidgetRegistry {
     @FunctionalInterface
-    private interface Factory<T extends ConfigOption<?>> {
+    public interface Factory<T extends ConfigOption<?>> {
         AbstractWidget create(Font font, int x, int y, int width, T option, Runnable onChanged, boolean opensUp);
     }
 
@@ -21,10 +21,24 @@ public final class OptionWidgetRegistry {
                 new SliderWidget(x, y, width, option, changed));
         register(DoubleOption.class, (font, x, y, width, option, changed, up) ->
                 new SliderWidget(x, y, width, option, changed));
+        register(LongOption.class, (font, x, y, width, option, changed, up) ->
+                new SliderWidget(x, y, width, option, changed));
+        register(FloatOption.class, (font, x, y, width, option, changed, up) ->
+                new SliderWidget(x, y, width, option, changed));
         register(StringOption.class, (font, x, y, width, option, changed, up) ->
                 new TextFieldWidget(font, x, y, width, option, changed));
         FACTORIES.put(EnumOption.class, (Factory<EnumOption<?>>) (font, x, y, width, option, changed, up) ->
                 new EnumSelectorWidget(x, y, width, option, changed, up));
+        FACTORIES.put(SelectorOption.class, (Factory<SelectorOption<?>>) (font, x, y, width, option, changed, up) ->
+                new SelectorWidget<>(x, y, width, option, changed, up));
+        register(ColorOption.class, (font, x, y, width, option, changed, up) ->
+                new ColorFieldWidget(font, x, y, width, option, changed));
+        register(KeybindOption.class, (font, x, y, width, option, changed, up) ->
+                new KeybindWidget(x, y, width, option, changed));
+        FACTORIES.put(ListOption.class, (Factory<ListOption<?>>) (font, x, y, width, option, changed, up) ->
+                new ListFieldWidget<>(font, x, y, width, option, changed));
+        register(SubcategoryOption.class, (font, x, y, width, option, changed, up) ->
+                new SubcategoryWidget(x, y, width, option, changed));
     }
 
     private OptionWidgetRegistry() {}
@@ -36,8 +50,9 @@ public final class OptionWidgetRegistry {
         return createUnchecked(factory, font, x, y, width, option, onChanged, opensUp);
     }
 
-    private static <T extends ConfigOption<?>> void register(Class<T> type, Factory<T> factory) {
-        FACTORIES.put(type, factory);
+    /** Registers or replaces a widget factory for a custom option class. */
+    public static synchronized <T extends ConfigOption<?>> void register(Class<T> type, Factory<T> factory) {
+        FACTORIES.put(Objects.requireNonNull(type, "type"), Objects.requireNonNull(factory, "factory"));
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})

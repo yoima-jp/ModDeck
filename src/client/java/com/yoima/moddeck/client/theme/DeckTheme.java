@@ -60,6 +60,21 @@ public final class DeckTheme {
         applyMode();
     }
 
+    /** Applies a screen-local accent while deriving readable dark and muted variants. */
+    public static void applyAccent(int color) {
+        if (color == 0) return;
+        ACCENT = 0xFF000000 | color & 0xFFFFFF;
+        ACCENT_DARK = blend(ACCENT, 0xFF000000, 0.28f);
+        ACCENT_MUTED = blend(PANEL, ACCENT, dark ? 0.38f : 0.22f);
+    }
+
+    private static int blend(int from, int to, float amount) {
+        int red = Math.round(((from >> 16) & 0xFF) * (1 - amount) + ((to >> 16) & 0xFF) * amount);
+        int green = Math.round(((from >> 8) & 0xFF) * (1 - amount) + ((to >> 8) & 0xFF) * amount);
+        int blue = Math.round((from & 0xFF) * (1 - amount) + (to & 0xFF) * amount);
+        return 0xFF000000 | red << 16 | green << 8 | blue;
+    }
+
     private static void applyMode() {
         boolean useDark = mode == Mode.DARK || mode == Mode.AUTO && SystemThemeDetector.prefersDark();
         if (useDark) applyDark(); else applyLight();

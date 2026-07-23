@@ -1,9 +1,14 @@
 package com.yoima.moddeck.api.option;
 
 import com.yoima.moddeck.api.OptionPresentation;
+import com.yoima.moddeck.api.ConfigText;
 
 public final class BooleanOption extends ConfigOption<Boolean> {
     public BooleanOption(String id, String name, String description, boolean defaultValue) {
+        super(id, name, description, defaultValue, OptionPresentation.TOGGLE);
+    }
+
+    public BooleanOption(String id, ConfigText name, ConfigText description, boolean defaultValue) {
         super(id, name, description, defaultValue, OptionPresentation.TOGGLE);
     }
 

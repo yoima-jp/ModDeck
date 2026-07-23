@@ -31,6 +31,14 @@ public final class SliderWidget extends AbstractSliderButton {
         this(x, y, width, option, option.minimum(), option.maximum(), option.value(), onChanged);
     }
 
+    public SliderWidget(int x, int y, int width, LongOption option, Runnable onChanged) {
+        this(x, y, width, option, option.minimum(), option.maximum(), option.value(), onChanged);
+    }
+
+    public SliderWidget(int x, int y, int width, FloatOption option, Runnable onChanged) {
+        this(x, y, width, option, option.minimum(), option.maximum(), option.value(), onChanged);
+    }
+
     private SliderWidget(int x, int y, int width, ConfigOption<?> option, double minimum, double maximum,
                          double current, Runnable onChanged) {
         super(x, y, width, 30, Component.empty(), normalize(current, minimum, maximum));
@@ -38,6 +46,7 @@ public final class SliderWidget extends AbstractSliderButton {
         this.minimum = minimum;
         this.maximum = maximum;
         this.onChanged = onChanged;
+        active = option.editable();
         updateMessage();
     }
 
@@ -136,9 +145,13 @@ public final class SliderWidget extends AbstractSliderButton {
     @Override protected void applyValue() {
         double raw = minimum + value * (maximum - minimum);
         if (option instanceof IntegerOption integer) {
-            integer.setValue((int) Math.round(raw));
+            integer.trySetValue((int) Math.round(raw));
+        } else if (option instanceof LongOption longOption) {
+            longOption.trySetValue(Math.round(raw));
+        } else if (option instanceof FloatOption floatOption) {
+            floatOption.trySetValue((float) raw);
         } else if (option instanceof DoubleOption decimal) {
-            decimal.setValue(raw);
+            decimal.trySetValue(raw);
         }
         updateMessage();
         onChanged.run();
@@ -150,6 +163,8 @@ public final class SliderWidget extends AbstractSliderButton {
 
     private String format(double number) {
         if (option instanceof IntegerOption) return Integer.toString((int) Math.round(number));
+        if (option instanceof LongOption) return Long.toString(Math.round(number));
+        if (option instanceof FloatOption) return Float.toString((float) number);
         return BigDecimal.valueOf(number).stripTrailingZeros().toPlainString();
     }
 
@@ -173,13 +188,17 @@ public final class SliderWidget extends AbstractSliderButton {
             double clamped = Math.max(minimum, Math.min(maximum, parsed));
             if (option instanceof IntegerOption integer) {
                 integer.setValue((int) Math.round(clamped));
+            } else if (option instanceof LongOption longOption) {
+                longOption.setValue(Math.round(clamped));
+            } else if (option instanceof FloatOption floatOption) {
+                floatOption.setValue((float) clamped);
             } else if (option instanceof DoubleOption decimal) {
                 decimal.setValue(clamped);
             }
             value = normalize(((Number) option.value()).doubleValue(), minimum, maximum);
             updateMessage();
             onChanged.run();
-        } catch (NumberFormatException ignored) {
+        } catch (IllegalArgumentException ignored) {
             // Invalid transient input is discarded; the last valid option value remains active.
             updateMessage();
         }

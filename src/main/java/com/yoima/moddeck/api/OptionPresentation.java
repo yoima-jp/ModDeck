@@ -7,5 +7,11 @@ public enum OptionPresentation {
     SLIDER,
     NUMBER_FIELD,
     TEXT_FIELD,
-    SELECTOR
+    SELECTOR,
+    DROPDOWN,
+    COLOR,
+    KEYBIND,
+    LIST,
+    SUBCATEGORY,
+    CUSTOM
 }

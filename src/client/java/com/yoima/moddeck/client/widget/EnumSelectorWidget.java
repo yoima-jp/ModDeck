@@ -11,18 +11,18 @@ import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 
 /** Selector that expands into an in-place themed menu rather than cycling invisibly. */
-public final class EnumSelectorWidget extends AbstractWidget {
+public final class EnumSelectorWidget extends AbstractWidget implements ExpandableOptionWidget {
     private static final int ITEM_HEIGHT = 22;
     private final EnumOption<?> option;
     private final Runnable onChanged;
-    private final boolean opensUp;
     private boolean expanded;
+    private int viewportTop = Integer.MIN_VALUE;
+    private int viewportBottom = Integer.MAX_VALUE;
 
     public EnumSelectorWidget(int x, int y, int width, EnumOption<?> option, Runnable onChanged, boolean opensUp) {
-        super(x, y, width, 28, Component.literal(option.displayName()));
+        super(x, y, width, 28, option.displayNameText().component());
         this.option = option;
         this.onChanged = onChanged;
-        this.opensUp = opensUp;
     }
 
     @Override public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
@@ -42,11 +42,14 @@ public final class EnumSelectorWidget extends AbstractWidget {
         DeckTheme.border(graphics, getX(), getY(), getWidth(), getHeight(), 5,
                 expanded || isHoveredOrFocused() ? DeckTheme.ACCENT_DARK : DeckTheme.DIVIDER, DeckTheme.FIELD);
         var font = DeckFonts.ui();
-        graphics.text(font, option.value().name(), getX() + 12, getY() + 10, DeckTheme.TEXT, false);
+        graphics.text(font, enumLabel(option.value()), getX() + 12, getY() + 10, DeckTheme.TEXT, false);
         DeckIcons.draw(graphics, expanded ? DeckIcons.Icon.CHEVRON_UP : DeckIcons.Icon.CHEVRON_DOWN,
                 getRight() - 19, getY() + 7, 14, DeckTheme.TEXT_SECONDARY);
-        if (!expanded) return;
+    }
 
+    @Override public void extractPopupRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
+        if (!expanded) return;
+        var font = DeckFonts.ui();
         int menuY = menuY();
         int menuHeight = option.values().size() * ITEM_HEIGHT;
         DeckTheme.border(graphics, getX(), menuY, getWidth(), menuHeight, 5,
@@ -59,12 +62,19 @@ public final class EnumSelectorWidget extends AbstractWidget {
                 DeckTheme.roundedRect(graphics, getX() + 3, itemY + 2, getWidth() - 6, ITEM_HEIGHT - 4,
                         3, DeckTheme.ACCENT_DARK);
             }
-            graphics.text(font, value.name(), getX() + 12, itemY + 8,
+            graphics.text(font, enumLabel(value), getX() + 12, itemY + 8,
                     selected ? DeckTheme.TEXT : DeckTheme.TEXT_SECONDARY, false);
             if (selected) DeckIcons.draw(graphics, DeckIcons.Icon.CHECK,
                     getRight() - 18, itemY + 5, 13, DeckTheme.TEXT);
         }
     }
+
+    @Override public void setPopupViewport(int top, int bottom) {
+        viewportTop = top;
+        viewportBottom = bottom;
+    }
+
+    @Override public boolean isExpanded() { return expanded; }
 
     @Override protected void updateWidgetNarration(NarrationElementOutput output) {
         defaultButtonNarrationText(output);
@@ -94,12 +104,21 @@ public final class EnumSelectorWidget extends AbstractWidget {
     }
 
     private int menuY() {
-        return opensUp ? getY() - option.values().size() * ITEM_HEIGHT - 2 : getBottom() + 2;
+        int height = option.values().size() * ITEM_HEIGHT;
+        int below = getBottom() + 2;
+        if (below + height <= viewportBottom) return below;
+        return Math.max(viewportTop, getY() - height - 2);
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
     private void setEnumValue(int index) {
         EnumOption raw = option;
-        raw.setValue((Enum) option.values().get(index));
+        raw.trySetValue((Enum) option.values().get(index));
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private Component enumLabel(Enum<?> value) {
+        EnumOption raw = option;
+        return ((com.yoima.moddeck.api.ConfigText) raw.label(value)).component();
     }
 }

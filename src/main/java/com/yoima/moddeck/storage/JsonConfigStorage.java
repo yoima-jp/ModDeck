@@ -33,16 +33,7 @@ public final class JsonConfigStorage implements ConfigStorage {
             JsonObject values = root.has(category.id()) && root.get(category.id()).isJsonObject()
                     ? root.getAsJsonObject(category.id()) : null;
             if (values == null) continue;
-            for (ConfigOption<?> option : category.options()) {
-                JsonElement element = values.get(option.id());
-                if (element == null || element.isJsonNull()) continue;
-                try {
-                    setDecoded(option, primitiveValue(element));
-                } catch (RuntimeException exception) {
-                    LOGGER.log(Level.WARNING, "Ignoring invalid value " + category.id() + "." + option.id()
-                            + " in " + file, exception);
-                }
-            }
+            loadOptions(category.options(), values, category.id(), file);
         }
     }
 
@@ -51,11 +42,7 @@ public final class JsonConfigStorage implements ConfigStorage {
         JsonObject root = new JsonObject();
         for (ConfigCategory category : definition.categories()) {
             JsonObject values = new JsonObject();
-            for (ConfigOption<?> option : category.options()) {
-                Object value = option.value();
-                values.add(option.id(), value instanceof Enum<?> enumValue
-                        ? new JsonPrimitive(enumValue.name()) : GSON.toJsonTree(value));
-            }
+            saveOptions(category.options(), values);
             root.add(category.id(), values);
         }
         Path target = fileFor(definition);
@@ -81,8 +68,44 @@ public final class JsonConfigStorage implements ConfigStorage {
         return file;
     }
 
-    private static Object primitiveValue(JsonElement element) {
-        if (!element.isJsonPrimitive()) throw new IllegalArgumentException("Expected primitive JSON value");
+    private static void loadOptions(java.util.List<ConfigOption<?>> options, JsonObject values,
+                                    String path, Path file) {
+        for (ConfigOption<?> option : options) {
+            if (option instanceof com.yoima.moddeck.api.option.SubcategoryOption subcategory) {
+                JsonObject childValues = values.has(option.id()) && values.get(option.id()).isJsonObject()
+                        ? values.getAsJsonObject(option.id()) : null;
+                if (childValues != null) loadOptions(subcategory.children(), childValues, path + "." + option.id(), file);
+                continue;
+            }
+            JsonElement element = values.get(option.id());
+            if (element == null || element.isJsonNull()) continue;
+            try {
+                setDecoded(option, storageValue(element));
+            } catch (RuntimeException exception) {
+                LOGGER.log(Level.WARNING, "Ignoring invalid value " + path + "." + option.id() + " in " + file, exception);
+            }
+        }
+    }
+
+    private static void saveOptions(java.util.List<ConfigOption<?>> options, JsonObject values) {
+        for (ConfigOption<?> option : options) {
+            if (option instanceof com.yoima.moddeck.api.option.SubcategoryOption subcategory) {
+                JsonObject childValues = new JsonObject();
+                saveOptions(subcategory.children(), childValues);
+                values.add(option.id(), childValues);
+            } else if (option.persistent()) {
+                values.add(option.id(), GSON.toJsonTree(option.encode()));
+            }
+        }
+    }
+
+    private static Object storageValue(JsonElement element) {
+        if (element.isJsonArray()) {
+            java.util.List<Object> values = new java.util.ArrayList<>();
+            for (JsonElement child : element.getAsJsonArray()) values.add(storageValue(child));
+            return java.util.List.copyOf(values);
+        }
+        if (!element.isJsonPrimitive()) throw new IllegalArgumentException("Expected primitive or array JSON value");
         JsonPrimitive primitive = element.getAsJsonPrimitive();
         if (primitive.isBoolean()) return primitive.getAsBoolean();
         if (primitive.isNumber()) return primitive.getAsNumber();
@@ -91,6 +114,6 @@ public final class JsonConfigStorage implements ConfigStorage {
 
     @SuppressWarnings({"rawtypes", "unchecked"})
     private static void setDecoded(ConfigOption option, Object rawValue) {
-        option.setValue(option.decode(rawValue));
+        option.loadEncodedValue(rawValue);
     }
 }

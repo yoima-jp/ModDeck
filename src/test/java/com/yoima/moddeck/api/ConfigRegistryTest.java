@@ -22,6 +22,7 @@ class ConfigRegistryTest {
         ConfigRegistry.register(definition);
 
         assertSame(definition, ConfigRegistry.get("example_mod").orElseThrow());
+        assertSame(definition, ConfigRegistry.get(ConfigRoute.parse("moddeck:config/example_mod")).orElseThrow());
         assertEquals(1, ConfigRegistry.getAll().size());
         IllegalStateException exception = assertThrows(IllegalStateException.class,
                 () -> ConfigRegistry.register(definition));

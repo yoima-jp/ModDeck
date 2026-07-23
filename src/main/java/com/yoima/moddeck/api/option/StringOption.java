@@ -1,11 +1,20 @@
 package com.yoima.moddeck.api.option;
 
 import com.yoima.moddeck.api.OptionPresentation;
+import com.yoima.moddeck.api.ConfigText;
 
 public final class StringOption extends ConfigOption<String> {
     private final int maximumLength;
 
     public StringOption(String id, String name, String description, String defaultValue, int maximumLength) {
+        super(id, name, description, defaultValue, OptionPresentation.TEXT_FIELD);
+        if (maximumLength < 1 || defaultValue.length() > maximumLength) {
+            throw new IllegalArgumentException("Invalid maximum length for " + id);
+        }
+        this.maximumLength = maximumLength;
+    }
+
+    public StringOption(String id, ConfigText name, ConfigText description, String defaultValue, int maximumLength) {
         super(id, name, description, defaultValue, OptionPresentation.TEXT_FIELD);
         if (maximumLength < 1 || defaultValue.length() > maximumLength) {
             throw new IllegalArgumentException("Invalid maximum length for " + id);
