@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "id": "moddeck",
+  "version": "${version}",
+  "name": "Mod Deck",
+  "description": "Declarative, reusable configuration screens for Fabric mods.",
+  "authors": ["yoima"],
+  "license": "MIT",
+  "environment": "*",
+  "entrypoints": {
+    "main": ["com.yoima.moddeck.ModDeck"],
+    "client": ["com.yoima.moddeck.client.ModDeckClient"]
+  },
+  "mixins": [
+    {
+      "config": "moddeck.client.mixins.json",
+      "environment": "client"
+    }
+  ],
+  "depends": {
+    "fabricloader": ">=0.19.3",
+    "minecraft": "~26.2",
+    "java": ">=25",
+    "fabric-api": ">=0.155.2"
+  }
+}

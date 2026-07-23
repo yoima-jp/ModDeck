@@ -1,0 +1,22 @@
+{
+  "key.category.moddeck.settings": "Mod Deck",
+  "key.moddeck.open": "Open settings",
+  "moddeck.title": "Settings",
+  "moddeck.save": "Save",
+  "moddeck.reset": "Reset",
+  "moddeck.done": "Done",
+  "moddeck.empty": "No configuration screens registered",
+  "moddeck.saved": "Saved",
+  "moddeck.save_failed": "Could not save settings",
+  "moddeck.subtitle": "Unified mod settings",
+  "moddeck.search": "Search mods...",
+  "moddeck.installed": "Installed mods",
+  "moddeck.change_key": "Change open key",
+  "moddeck.theme.auto": "Auto",
+  "moddeck.theme.dark": "Dark",
+  "moddeck.theme.light": "Light",
+  "moddeck.theme.select": "Theme",
+  "moddeck.category.empty": "No settings in this category",
+  "moddeck.reset_ready": "Defaults restored — save to apply",
+  "moddeck.saved_short": "Saved"
+}

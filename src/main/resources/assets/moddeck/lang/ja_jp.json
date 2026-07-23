@@ -1,0 +1,22 @@
+{
+  "key.category.moddeck.settings": "Mod Deck",
+  "key.moddeck.open": "設定を開く",
+  "moddeck.title": "設定",
+  "moddeck.save": "保存",
+  "moddeck.reset": "デフォルトに戻す",
+  "moddeck.done": "完了",
+  "moddeck.empty": "登録された設定はありません",
+  "moddeck.saved": "保存しました",
+  "moddeck.save_failed": "設定を保存できませんでした",
+  "moddeck.subtitle": "統合Mod設定",
+  "moddeck.search": "Modを検索...",
+  "moddeck.installed": "インストール済みMod",
+  "moddeck.change_key": "設定を開くキーを変更",
+  "moddeck.theme.auto": "自動",
+  "moddeck.theme.dark": "ダーク",
+  "moddeck.theme.light": "ライト",
+  "moddeck.theme.select": "テーマ",
+  "moddeck.category.empty": "このカテゴリに設定はありません",
+  "moddeck.reset_ready": "デフォルトに戻しました。保存してください",
+  "moddeck.saved_short": "保存済み"
+}
