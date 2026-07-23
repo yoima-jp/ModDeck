@@ -94,7 +94,7 @@ public final class JsonConfigStorage implements ConfigStorage {
                 saveOptions(subcategory.children(), childValues);
                 values.add(option.id(), childValues);
             } else if (option.persistent()) {
-                values.add(option.id(), GSON.toJsonTree(option.encode()));
+                values.add(option.id(), GSON.toJsonTree(option.encodeDraft()));
             }
         }
     }

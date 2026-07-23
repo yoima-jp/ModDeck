@@ -2,6 +2,7 @@ package com.yoima.moddeck.client.screen;
 
 import com.yoima.moddeck.api.*;
 import com.yoima.moddeck.api.option.ConfigOption;
+import com.yoima.moddeck.api.option.DescriptionOption;
 import com.yoima.moddeck.api.option.SubcategoryOption;
 import com.yoima.moddeck.api.storage.ConfigStorage;
 import com.yoima.moddeck.client.theme.DeckFonts;
@@ -21,7 +22,6 @@ import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.locale.Language;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
 
 /** Integrated hub matching the desktop-like Mod Deck reference while remaining a native Screen. */
 public final class ModListScreen extends Screen {
@@ -58,6 +58,8 @@ public final class ModListScreen extends Screen {
     private boolean statusError;
     private ConfigOption<?> hoveredOption;
     private boolean pendingWidgetRebuild;
+    private final Map<AbstractWidget, ConfigOption<?>> optionWidgets = new IdentityHashMap<>();
+    private List<String> renderedOptionIds = List.of();
 
     public ModListScreen(Screen parent) {
         this(parent, null);
@@ -71,6 +73,7 @@ public final class ModListScreen extends Screen {
 
     @Override protected void init() {
         pendingWidgetRebuild = false;
+        optionWidgets.clear();
         // Minecraft's automatic GUI scale can leave only 480 logical pixels on a 1920px-wide
         // display. A fixed virtual canvas preserves the reference layout without changing the
         // user's global GUI-scale preference; pointer events are transformed by the same factor.
@@ -114,6 +117,7 @@ public final class ModListScreen extends Screen {
         if (selected != null) {
             ConfigCategory category = selected.categories().get(Math.min(activeCategory, selected.categories().size() - 1));
             List<ConfigOption<?>> options = visibleOptions(category);
+            renderedOptionIds = options.stream().map(ConfigOption::id).toList();
             int availableHeight = Math.max(1, contentBottom - contentTop - 8);
             optionRowHeight = Math.max(42, Math.min(58, availableHeight / Math.max(1, options.size())));
             int widgetWidth = Math.max(150, Math.min(250, mainWidth * 42 / 100));
@@ -124,6 +128,10 @@ public final class ModListScreen extends Screen {
                 // A small tolerance absorbs rounding introduced by the virtual-canvas scale so
                 // the final row remains visible instead of requiring a meaningless 4–6px scroll.
                 if (y >= contentTop && y + optionRowHeight <= contentBottom) {
+                    if (option instanceof DescriptionOption) {
+                        y += optionRowHeight;
+                        continue;
+                    }
                     // Rebuilding while Minecraft is iterating child listeners can invalidate that
                     // iteration. Defer structural changes such as expanding a subcategory.
                     Runnable changed = option instanceof SubcategoryOption ? this::requestWidgetRebuild : this::markDirty;
@@ -131,10 +139,18 @@ public final class ModListScreen extends Screen {
                             y, widgetWidth, option,
                             changed, false);
                     widget.setY(y + Math.max(0, (optionRowHeight - widget.getHeight()) / 2));
+                    widget.active = option.editable() && option.isEnabled();
                     if (widget instanceof ExpandableOptionWidget popup) {
                         popup.setPopupViewport(contentTop + 3, contentBottom - 3);
                     }
                     addRenderableWidget(widget);
+                    optionWidgets.put(widget, option);
+                    if (!(option instanceof SubcategoryOption)) {
+                        OptionResetWidget reset = new OptionResetWidget(widgetX - 26,
+                                y + Math.max(0, (optionRowHeight - 22) / 2), option, this::markDirty);
+                        reset.refreshState();
+                        addRenderableWidget(reset);
+                    }
                 }
                 y += optionRowHeight;
             }
@@ -154,13 +170,10 @@ public final class ModListScreen extends Screen {
     }
 
     @Override public void extractBackground(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
-        ConfigScreenStyle style = selected == null ? ConfigScreenStyle.DEFAULT : selected.style();
-        if (!style.backgroundTexture().isEmpty()) {
-            graphics.blit(Identifier.parse(style.backgroundTexture()), 0, 0, uiWidth, uiHeight, 0, 1, 0, 1);
-        } else if (!style.transparentBackground()) {
-            graphics.fill(0, 0, uiWidth, uiHeight, DeckTheme.BACKGROUND);
-        }
-        if (!style.transparentBackground()) graphics.fill(0, 0, uiWidth, HEADER_HEIGHT, DeckTheme.BACKGROUND_TOP);
+        // The shell is deliberately not mod-customizable: the recognizable Mod Deck workspace is
+        // part of navigation consistency, while per-mod accent and save policy remain safe options.
+        graphics.fill(0, 0, uiWidth, uiHeight, DeckTheme.BACKGROUND);
+        graphics.fill(0, 0, uiWidth, HEADER_HEIGHT, DeckTheme.BACKGROUND_TOP);
         DeckTheme.roundedRect(graphics, MARGIN, 91, sidebarWidth, Math.max(40, uiHeight - 151), 7, DeckTheme.PANEL);
         DeckTheme.roundedRect(graphics, MARGIN, uiHeight - 51, sidebarWidth, 41, 7, DeckTheme.PANEL);
         if (mainWidth > 0) DeckTheme.roundedRect(graphics, mainX, mainTop, mainWidth, mainBottom - mainTop, 8, DeckTheme.PANEL);
@@ -284,7 +297,23 @@ public final class ModListScreen extends Screen {
         return true;
     }
 
-    @Override public void onClose() { minecraft.setScreenAndShow(parent); }
+    @Override public void onClose() {
+        if (definitions.stream().noneMatch(ConfigDefinition::isDirty)) {
+            minecraft.setScreenAndShow(parent);
+            return;
+        }
+        minecraft.setScreenAndShow(new ConfirmScreen(discard -> {
+            if (discard) {
+                definitions.stream().filter(ConfigDefinition::isDirty).forEach(ConfigDefinition::discardChanges);
+                minecraft.setScreenAndShow(parent);
+            } else {
+                minecraft.setScreenAndShow(this);
+            }
+        }, Component.translatable("moddeck.discard.title"),
+                Component.translatable("moddeck.discard.message"),
+                Component.translatable("moddeck.discard.confirm"),
+                Component.translatable("moddeck.discard.cancel")));
+    }
 
     @Override public boolean keyPressed(KeyEvent event) {
         for (var child : children()) {
@@ -297,7 +326,13 @@ public final class ModListScreen extends Screen {
 
     @Override public void tick() {
         super.tick();
-        if (renderedLanguage != Language.getInstance() || pendingWidgetRebuild) rebuildWidgets();
+        optionWidgets.forEach((widget, option) -> widget.active = option.editable() && option.isEnabled());
+        children().stream().filter(OptionResetWidget.class::isInstance)
+                .map(OptionResetWidget.class::cast).forEach(OptionResetWidget::refreshState);
+        List<String> currentIds = selected == null ? List.of()
+                : visibleOptions(selected.categories().get(activeCategory)).stream().map(ConfigOption::id).toList();
+        if (renderedLanguage != Language.getInstance() || pendingWidgetRebuild
+                || !currentIds.equals(renderedOptionIds)) rebuildWidgets();
     }
 
     @Override public boolean mouseReleased(MouseButtonEvent event) {
@@ -414,7 +449,12 @@ public final class ModListScreen extends Screen {
         for (int index = 0; index < options.size(); index++) {
             ConfigOption<?> option = options.get(index);
             if (y + optionRowHeight > contentTop && y < contentBottom) {
-                graphics.text(uiFont, option.displayNameText().component(), mainX + 30, y + 13, DeckTheme.TEXT, false);
+                if (option instanceof DescriptionOption) {
+                    graphics.text(uiFont, fit(option.displayNameText().component(), mainWidth - 60),
+                            mainX + 30, y + 19, DeckTheme.TEXT_SECONDARY, false);
+                } else {
+                int labelColor = option.isEnabled() ? DeckTheme.TEXT : DeckTheme.TEXT_MUTED;
+                graphics.text(uiFont, option.displayNameText().component(), mainX + 30, y + 13, labelColor, false);
                 if (option.isRestartRequired()) {
                     graphics.text(uiFont, Component.translatable("moddeck.requires_restart"),
                             mainX + 36 + uiFont.width(option.displayNameText().component()), y + 13,
@@ -427,6 +467,7 @@ public final class ModListScreen extends Screen {
                 } else if (!option.descriptionText().isEmpty()) {
                     graphics.text(uiFont, fit(option.descriptionText().component(), Math.max(90, mainWidth / 2 - 45)),
                             mainX + 30, y + 28, DeckTheme.TEXT_SECONDARY, false);
+                }
                 }
                 if (index < options.size() - 1) {
                     graphics.fill(mainX + 30, y + optionRowHeight - 1, mainX + mainWidth - 30,
@@ -564,6 +605,8 @@ public final class ModListScreen extends Screen {
         return option.displayNameText().component().getString().toLowerCase(Locale.ROOT).contains(query)
                 || option.descriptionText().component().getString().toLowerCase(Locale.ROOT).contains(query)
                 || option.id().contains(query)
+                || option.searchAliases().stream().map(text -> text.toLowerCase(Locale.ROOT))
+                .anyMatch(alias -> alias.contains(query))
                 || option instanceof SubcategoryOption subcategory
                 && flattenOptions(subcategory.children(), true).stream().anyMatch(this::matchesQuery);
     }
@@ -571,8 +614,9 @@ public final class ModListScreen extends Screen {
     private List<ConfigOption<?>> flattenOptions(List<ConfigOption<?>> options, boolean forceExpanded) {
         List<ConfigOption<?>> flattened = new ArrayList<>();
         for (ConfigOption<?> option : options) {
+            if (!option.isDisplayed()) continue;
             flattened.add(option);
-            if (option instanceof SubcategoryOption subcategory && (forceExpanded || subcategory.value())) {
+            if (option instanceof SubcategoryOption subcategory && (forceExpanded || subcategory.draftValue())) {
                 flattened.addAll(flattenOptions(subcategory.children(), forceExpanded));
             }
         }

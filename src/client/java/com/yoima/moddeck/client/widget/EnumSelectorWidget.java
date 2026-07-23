@@ -42,7 +42,7 @@ public final class EnumSelectorWidget extends AbstractWidget implements Expandab
         DeckTheme.border(graphics, getX(), getY(), getWidth(), getHeight(), 5,
                 expanded || isHoveredOrFocused() ? DeckTheme.ACCENT_DARK : DeckTheme.DIVIDER, DeckTheme.FIELD);
         var font = DeckFonts.ui();
-        graphics.text(font, enumLabel(option.value()), getX() + 12, getY() + 10, DeckTheme.TEXT, false);
+        graphics.text(font, enumLabel(option.draftValue()), getX() + 12, getY() + 10, DeckTheme.TEXT, false);
         DeckIcons.draw(graphics, expanded ? DeckIcons.Icon.CHEVRON_UP : DeckIcons.Icon.CHEVRON_DOWN,
                 getRight() - 19, getY() + 7, 14, DeckTheme.TEXT_SECONDARY);
     }
@@ -57,7 +57,7 @@ public final class EnumSelectorWidget extends AbstractWidget implements Expandab
         for (int index = 0; index < option.values().size(); index++) {
             Enum<?> value = option.values().get(index);
             int itemY = menuY + index * ITEM_HEIGHT;
-            boolean selected = value == option.value();
+            boolean selected = value == option.draftValue();
             if (selected) {
                 DeckTheme.roundedRect(graphics, getX() + 3, itemY + 2, getWidth() - 6, ITEM_HEIGHT - 4,
                         3, DeckTheme.ACCENT_DARK);
@@ -113,7 +113,7 @@ public final class EnumSelectorWidget extends AbstractWidget implements Expandab
     @SuppressWarnings({"rawtypes", "unchecked"})
     private void setEnumValue(int index) {
         EnumOption raw = option;
-        raw.trySetValue((Enum) option.values().get(index));
+        raw.trySetDraftValue((Enum) option.values().get(index));
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})

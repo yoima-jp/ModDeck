@@ -31,7 +31,7 @@
   "example_mod.option.cache": "キャッシュ上限",
   "example_mod.option.cache.desc": "キャッシュの最大サイズです。",
   "example_mod.option.tags": "タグ",
-  "example_mod.option.tags.desc": "セミコロンで項目を区切ります。",
+  "example_mod.option.tags.desc": "リスト項目の編集、並べ替え、追加、削除ができます。",
   "example_mod.option.overlay": "オーバーレイ色",
   "example_mod.option.overlay.desc": "8桁のARGB色です。"
 }

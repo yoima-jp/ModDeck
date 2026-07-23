@@ -5,11 +5,18 @@ import com.yoima.moddeck.api.OptionPresentation;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Supplier;
+import com.yoima.moddeck.api.validation.ConfigValidator;
+import com.yoima.moddeck.api.validation.ValidationResult;
 
 public final class ListOption<T> extends ConfigOption<List<T>> {
     private final ValueCodec<T> elementCodec;
     private final int minimumSize;
     private final int maximumSize;
+    private Supplier<T> newElementSupplier;
+    private ConfigValidator<T> elementValidator = ConfigValidator.acceptingAll();
+    private boolean insertionAllowed = true;
+    private boolean deletionAllowed = true;
 
     public ListOption(String id, ConfigText name, ConfigText description, List<T> defaultValue,
                       ValueCodec<T> elementCodec, int minimumSize, int maximumSize) {
@@ -21,12 +28,34 @@ public final class ListOption<T> extends ConfigOption<List<T>> {
         this.elementCodec = Objects.requireNonNull(elementCodec, "elementCodec");
         this.minimumSize = minimumSize;
         this.maximumSize = maximumSize;
+        this.newElementSupplier = () -> defaultValue.isEmpty() ? null : defaultValue.getFirst();
     }
 
     public int minimumSize() { return minimumSize; }
     public int maximumSize() { return maximumSize; }
     public String encodeElement(T value) { return elementCodec.encode(value); }
     public T decodeElement(String value) { return elementCodec.decode(value); }
+    public ValidationResult validateElement(T value) {
+        return Objects.requireNonNull(elementValidator.validate(value), "element validation result");
+    }
+    public T newElement() {
+        T value = newElementSupplier.get();
+        if (value == null) throw new IllegalStateException("No new element supplier configured for " + id());
+        return value;
+    }
+    public boolean insertionAllowed() { return insertionAllowed; }
+    public boolean deletionAllowed() { return deletionAllowed; }
+    public ListOption<T> newElementFrom(Supplier<T> supplier) {
+        newElementSupplier = Objects.requireNonNull(supplier, "supplier");
+        return this;
+    }
+    public ListOption<T> validateElementsWith(ConfigValidator<T> validator) {
+        elementValidator = Objects.requireNonNull(validator, "validator");
+        validate(draftValue());
+        return this;
+    }
+    public ListOption<T> allowInsertion(boolean allowed) { insertionAllowed = allowed; return this; }
+    public ListOption<T> allowDeletion(boolean allowed) { deletionAllowed = allowed; return this; }
 
     @Override public List<T> decode(Object value) {
         if (!(value instanceof List<?> values)) throw new IllegalArgumentException("Expected list for " + id());
@@ -39,11 +68,16 @@ public final class ListOption<T> extends ConfigOption<List<T>> {
     }
 
     @Override public Object encode() { return value().stream().map(elementCodec::encode).toList(); }
+    @Override public Object encodeDraft() { return draftValue().stream().map(elementCodec::encode).toList(); }
 
     @Override protected List<T> validate(List<T> value) {
         List<T> copy = List.copyOf(value);
         if (copy.size() < minimumSize || copy.size() > maximumSize) {
             throw new IllegalArgumentException("List size is out of range for " + id());
+        }
+        for (T element : copy) {
+            ValidationResult result = validateElement(element);
+            if (!result.valid()) throw new IllegalArgumentException(result.error().orElseThrow().component().getString());
         }
         return copy;
     }

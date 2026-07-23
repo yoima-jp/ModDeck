@@ -13,5 +13,6 @@ public enum OptionPresentation {
     KEYBIND,
     LIST,
     SUBCATEGORY,
+    DESCRIPTION,
     CUSTOM
 }

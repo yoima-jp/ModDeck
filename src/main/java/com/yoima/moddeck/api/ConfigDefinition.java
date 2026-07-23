@@ -55,6 +55,9 @@ public final class ConfigDefinition {
     }
 
     public void reset() { categories.forEach(category -> category.options().forEach(ConfigOption::reset)); }
+    public void discardChanges() {
+        categories.forEach(category -> category.options().forEach(ConfigOption::discardChanges));
+    }
 
     private static List<ConfigOption<?>> flatten(List<ConfigOption<?>> options) {
         List<ConfigOption<?>> flattened = new ArrayList<>();
@@ -84,6 +87,7 @@ public final class ConfigDefinition {
         private CategoryBuilder currentCategory;
         private ConfigScreenStyle style = ConfigScreenStyle.DEFAULT;
         private Runnable saveCallback = () -> {};
+        private boolean editable = true;
         private int nextCategoryOrder;
 
         private Builder(String modId) {
@@ -112,6 +116,7 @@ public final class ConfigDefinition {
             this.saveCallback = Objects.requireNonNull(callback, "callback");
             return this;
         }
+        public Builder editable(boolean editable) { this.editable = editable; return this; }
 
         public Builder category(String id, String displayName) {
             return category(id, ConfigText.literal(displayName), nextCategoryOrder++);
@@ -131,6 +136,9 @@ public final class ConfigDefinition {
         }
 
         public Builder addOption(ConfigOption<?> option) { return add(option); }
+        public Builder descriptionEntry(String id, ConfigText text) {
+            return add(new DescriptionOption(id, text));
+        }
 
         public Builder booleanOption(String id, String name, boolean defaultValue) {
             return booleanOption(id, name, "", defaultValue);
@@ -227,7 +235,15 @@ public final class ConfigDefinition {
             List<ConfigCategory> built = categories.values().stream()
                     .sorted(Comparator.comparingInt(category -> category.order))
                     .map(CategoryBuilder::build).toList();
+            if (!editable) built.forEach(category -> setEditable(category.options(), false));
             return new ConfigDefinition(modId, route, title, description, built, style, saveCallback);
+        }
+
+        private static void setEditable(List<ConfigOption<?>> options, boolean editable) {
+            for (ConfigOption<?> option : options) {
+                option.editable(editable);
+                if (option instanceof SubcategoryOption subcategory) setEditable(subcategory.children(), editable);
+            }
         }
 
         private Builder add(ConfigOption<?> option) {

@@ -4,6 +4,7 @@ import com.yoima.moddeck.api.option.*;
 import com.yoima.moddeck.api.validation.ValidationResult;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -22,8 +23,9 @@ class ConfigDefinitionTest {
         assertEquals(5, definition.categories().getFirst().options().size());
         assertEquals("Example description", definition.descriptionText().value());
         IntegerOption volume = (IntegerOption) definition.option("general", "volume").orElseThrow();
-        volume.setValue(80);
+        volume.setDraftValue(80);
         definition.reset();
+        assertEquals(50, volume.draftValue());
         assertEquals(50, volume.value());
     }
 
@@ -52,15 +54,62 @@ class ConfigDefinitionTest {
                 "key.keyboard.g", java.util.Set.of(
                         KeybindOption.InputType.KEYBOARD, KeybindOption.InputType.MOUSE), true);
 
-        assertTrue(option.trySetValue("key.mouse.left"));
-        assertTrue(option.trySetValue(KeybindOption.UNBOUND_KEY));
+        assertTrue(option.trySetDraftValue("key.mouse.left"));
+        assertTrue(option.trySetDraftValue(KeybindOption.UNBOUND_KEY));
         assertTrue(option.isUnbound());
 
         KeybindOption keyboardOnly = new KeybindOption("keyboard", ConfigText.literal("Keyboard"),
                 ConfigText.empty(), "key.keyboard.k", java.util.Set.of(KeybindOption.InputType.KEYBOARD), false);
-        assertFalse(keyboardOnly.trySetValue("key.mouse.left"));
-        assertFalse(keyboardOnly.trySetValue(KeybindOption.UNBOUND_KEY));
+        assertFalse(keyboardOnly.trySetDraftValue("key.mouse.left"));
+        assertFalse(keyboardOnly.trySetDraftValue(KeybindOption.UNBOUND_KEY));
         assertEquals("key.keyboard.k", keyboardOnly.value());
+    }
+
+    @Test void keybindCanPersistOrderedModifierChords() {
+        KeybindOption option = new KeybindOption("action", ConfigText.literal("Action"), ConfigText.empty(),
+                "key.keyboard.g", java.util.Set.of(KeybindOption.InputType.KEYBOARD,
+                KeybindOption.InputType.MOUSE), true).allowModifiers(true);
+        assertTrue(option.trySetDraftValue("control+shift+key.keyboard.g"));
+        assertEquals("key.keyboard.g", KeybindOption.baseKey(option.draftValue()));
+        assertTrue(option.trySetDraftValue("alt+key.mouse.left"));
+    }
+
+    @Test void requirementsDynamicDefaultsFormattersAndDescriptionAreComposable() {
+        BooleanOption enabled = new BooleanOption("enabled", ConfigText.literal("Enabled"), ConfigText.empty(), true);
+        AtomicInteger dynamicDefault = new AtomicInteger(4);
+        IntegerOption count = new IntegerOption("count", ConfigText.literal("Count"), ConfigText.empty(),
+                2, 0, 10, 1);
+        count.enabledWhen(ConfigRequirement.isTrue(enabled))
+                .displayedWhen(ConfigRequirement.not(ConfigRequirement.isFalse(enabled)))
+                .defaultValueFrom(dynamicDefault::get)
+                .formatWith(value -> ConfigText.literal(value + " px"));
+        assertTrue(count.isEnabled());
+        assertEquals("2 px", count.formattedDraftValue().value());
+        count.reset();
+        assertEquals(4, count.draftValue());
+        dynamicDefault.set(6);
+        count.reset();
+        assertEquals(6, count.draftValue());
+        enabled.setDraftValue(false);
+        assertFalse(count.isEnabled());
+        assertFalse(count.isDisplayed());
+        DescriptionOption description = new DescriptionOption("hint", ConfigText.literal("Hint"));
+        assertFalse(description.persistent());
+        assertFalse(description.isDirty());
+    }
+
+    @Test void listSupportsElementValidationAndCreationPolicy() {
+        ValueCodec<String> codec = new ValueCodec<>() {
+            @Override public String encode(String value) { return value; }
+            @Override public String decode(String value) { return value; }
+        };
+        ListOption<String> option = new ListOption<>("names", ConfigText.literal("Names"), ConfigText.empty(),
+                List.of("Alex"), codec, 1, 3).newElementFrom(() -> "Player")
+                .validateElementsWith(value -> value.isBlank()
+                        ? ValidationResult.invalid(ConfigText.literal("Required")) : ValidationResult.success());
+        assertEquals("Player", option.newElement());
+        assertFalse(option.trySetDraftValue(List.of("")));
+        assertTrue(option.trySetDraftValue(List.of("Alex", "Steve")));
     }
 
     @Test void preservesTranslationKeysAndExplicitCategoryOrder() {
@@ -94,11 +143,13 @@ class ConfigDefinitionTest {
                 .category("general", "General").addOption(count)
                 .onSave(screenSaves::incrementAndGet).build();
 
-        assertFalse(count.trySetValue(3));
+        assertFalse(count.trySetDraftValue(3));
         assertEquals(2, count.value());
         assertEquals("Even values only", count.validationError().orElseThrow().value());
-        assertTrue(count.trySetValue(4));
+        assertTrue(count.trySetDraftValue(4));
         assertTrue(definition.isDirty());
+        assertEquals(2, count.value());
+        assertEquals(4, count.draftValue());
         assertEquals(1, changes.get());
         assertEquals(0, optionSaves.get());
         definition.notifySaved();
@@ -122,16 +173,33 @@ class ConfigDefinitionTest {
         assertFalse(definition.isDirty());
     }
 
+    @Test void discardRestoresLastAppliedValueWithoutSaveCallbacks() {
+        AtomicInteger saves = new AtomicInteger();
+        StringOption name = new StringOption("name", ConfigText.literal("Name"), ConfigText.empty(), "saved", 32);
+        name.onSaved(value -> saves.incrementAndGet());
+        ConfigDefinition definition = ConfigDefinition.builder("discard_mod")
+                .category("general", "General").addOption(name).build();
+
+        name.setDraftValue("draft");
+        assertEquals("saved", name.value());
+        assertEquals("draft", name.draftValue());
+        definition.discardChanges();
+
+        assertEquals("saved", name.draftValue());
+        assertFalse(definition.isDirty());
+        assertEquals(0, saves.get());
+    }
+
     @Test void findsAndResetsNestedSubcategoryOptions() {
         StringOption child = new StringOption("child", ConfigText.literal("Child"), ConfigText.empty(), "a", 8);
         SubcategoryOption group = SubcategoryOption.builder("group", ConfigText.literal("Group"))
                 .add(child).build();
         ConfigDefinition definition = ConfigDefinition.builder("nested_mod")
                 .category("general", "General").addOption(group).build();
-        child.setValue("b");
+        child.setDraftValue("b");
 
         assertSame(child, definition.option("general", "child").orElseThrow());
         definition.reset();
-        assertEquals("a", child.value());
+        assertEquals("a", child.draftValue());
     }
 }

@@ -36,7 +36,7 @@ public final class SelectorWidget<T> extends AbstractWidget implements Expandabl
         DeckTheme.border(graphics, getX(), getY(), getWidth(), getHeight(), 5,
                 expanded || isHoveredOrFocused() ? DeckTheme.ACCENT_DARK : DeckTheme.DIVIDER, DeckTheme.FIELD);
         var font = DeckFonts.ui();
-        graphics.text(font, option.label(option.value()).component(), getX() + 12, getY() + 10, DeckTheme.TEXT, false);
+        graphics.text(font, option.label(option.draftValue()).component(), getX() + 12, getY() + 10, DeckTheme.TEXT, false);
         DeckIcons.draw(graphics, expanded ? DeckIcons.Icon.CHEVRON_UP : DeckIcons.Icon.CHEVRON_DOWN,
                 getRight() - 19, getY() + 7, 14, DeckTheme.TEXT_SECONDARY);
     }
@@ -50,7 +50,7 @@ public final class SelectorWidget<T> extends AbstractWidget implements Expandabl
         for (int index = 0; index < option.choices().size(); index++) {
             T choice = option.choices().get(index);
             int itemY = menuY + index * ITEM_HEIGHT;
-            boolean selected = choice.equals(option.value());
+            boolean selected = choice.equals(option.draftValue());
             if (selected) DeckTheme.roundedRect(graphics, getX() + 3, itemY + 2, getWidth() - 6,
                     ITEM_HEIGHT - 4, 3, DeckTheme.ACCENT_DARK);
             graphics.text(font, option.label(choice).component(), getX() + 12, itemY + 8,
@@ -71,7 +71,7 @@ public final class SelectorWidget<T> extends AbstractWidget implements Expandabl
         if (mouseX < getX() || mouseX >= getRight() || mouseY < menuY
                 || mouseY >= menuY + option.choices().size() * ITEM_HEIGHT) return false;
         T selected = option.choices().get((int) ((mouseY - menuY) / ITEM_HEIGHT));
-        if (option.trySetValue(selected)) onChanged.run();
+        if (option.trySetDraftValue(selected)) onChanged.run();
         expanded = false;
         return true;
     }

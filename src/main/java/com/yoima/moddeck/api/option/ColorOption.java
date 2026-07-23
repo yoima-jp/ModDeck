@@ -15,6 +15,7 @@ public final class ColorOption extends ConfigOption<Integer> {
     public boolean alpha() { return alpha; }
 
     public String hexValue() { return String.format(alpha ? "%08X" : "%06X", value()); }
+    public String draftHexValue() { return String.format(alpha ? "%08X" : "%06X", draftValue()); }
 
     @Override public Integer decode(Object value) {
         if (value instanceof Number number) return normalize(number.intValue(), alpha);

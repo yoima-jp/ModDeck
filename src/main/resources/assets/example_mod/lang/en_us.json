@@ -31,7 +31,7 @@
   "example_mod.option.cache": "Cache limit",
   "example_mod.option.cache.desc": "Maximum cache size.",
   "example_mod.option.tags": "Tags",
-  "example_mod.option.tags.desc": "Separate list values with semicolons.",
+  "example_mod.option.tags.desc": "Edit, reorder, add, or remove list values.",
   "example_mod.option.overlay": "Overlay color",
   "example_mod.option.overlay.desc": "Eight-digit ARGB color."
 }

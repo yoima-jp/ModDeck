@@ -41,15 +41,17 @@ translation key. Put translations under the registering mod's own
 when Minecraft reloads the active language.
 
 Built-in entries cover Boolean, Integer, Long, Float, Double, String, Enum, RGB/ARGB Color,
-Keybind, generic List, generic Selector/Dropdown, Slider, and nested Subcategory values. Entries
-also support translated/dynamic tooltips, default reset, validators, change callbacks, save
+Keybind, generic List, generic Selector/Dropdown, Slider, description rows, and nested Subcategory
+values. Entries also support translated/dynamic tooltips, dynamic defaults, per-entry reset,
+validators, value formatters, search aliases, conditional display/enabling, change callbacks, save
 consumers, read-only state, and restart-required metadata. `SubcategoryOption` recursively applies
 storage, reset, validation, search, and callbacks to its children.
 
-Editing updates the option's in-memory value and invokes `onChanged` immediately; use that callback
-only for deliberate live previews. Until Save succeeds, the footer shows an unsaved-change warning.
-Save persists the values, clears the dirty baseline, and then invokes `onSaved` and the definition's
-`onSave` callback. Returning a value to its last saved value clears the warning automatically.
+Editing changes `draftValue()` and invokes `onChanged`, but the runtime-facing `value()` remains at
+the last loaded or saved value. Until Save succeeds, the footer shows an unsaved-change warning.
+Save first persists every draft, then commits them to `value()`, and invokes `onSaved` and the
+definition's `onSave` callback. Closing with unsaved edits asks whether to discard them; returning a
+draft to its last saved value clears the warning automatically.
 
 Keybind entries can independently allow keyboard keys, mouse buttons, and an unbound state:
 
@@ -58,7 +60,25 @@ builder.keybindOption("action", name, description, "key.keyboard.g",
     Set.of(KeybindOption.InputType.KEYBOARD, KeybindOption.InputType.MOUSE), true);
 ```
 
-While capturing input, Escape selects the unbound state instead of closing the parent screen.
+Call `allowModifiers(true)` on a `KeybindOption` to accept Ctrl/Shift/Alt/Super chords. While
+capturing input, Escape selects the unbound state instead of closing the parent screen.
+
+Lists open a dedicated editor with add, remove, reorder, size limits, custom new-element suppliers,
+and per-element validation. Colors open a matching RGB or ARGB channel picker. These focused screens
+reuse Mod Deck's cards and controls and return to the same configuration screen.
+
+Conditional entries use draft values, so dependent controls react while editing:
+
+```java
+advanced.displayedWhen(ConfigRequirement.isTrue(enabled));
+count.enabledWhen(ConfigRequirement.isValue(mode, Mode.DETAILED));
+```
+
+For annotation-driven registration, annotate a POJO with `@ModDeckAutoConfig`, mark fields with
+`@AutoEntry`, and add `@AutoRange`, `@AutoColor`, or `@AutoKeybind` where appropriate. Then call
+`AutoConfig.register(config)`. The returned `AutoConfigHolder` exposes the generated definition and
+load/save listeners. This is an independent UTF-8 JSON implementation; it does not use Cloth Auto
+Config or its serializers.
 
 Categories are not predefined. Registration order is the default display order; the
 `category(id, text, order)` overload supplies an explicit order. A single category uses no tab bar,
@@ -123,6 +143,6 @@ and included in the built jar under `META-INF/licenses/`.
 Public API lives under `com.yoima.moddeck.api`. Minecraft client classes are isolated in the
 `src/client` source set so the common entrypoint remains dedicated-server safe.
 
-The Cloth Config feature audit and current parity decisions are documented in
+The Cloth Config v26.2 feature audit and current parity decisions are documented in
 [docs/CLOTH_CONFIG_PARITY.md](docs/CLOTH_CONFIG_PARITY.md). Mod Deck does not depend on Cloth
 Config, Architectury, Auto Config, or any Cloth implementation classes.

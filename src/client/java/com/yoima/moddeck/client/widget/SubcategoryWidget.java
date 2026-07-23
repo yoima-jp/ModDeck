@@ -20,7 +20,7 @@ public final class SubcategoryWidget extends AbstractWidget {
     }
 
     @Override public void onClick(MouseButtonEvent event, boolean doubleClick) {
-        option.setValue(!option.value());
+        option.setDraftValue(!option.draftValue());
         onChanged.run();
     }
 
@@ -29,7 +29,7 @@ public final class SubcategoryWidget extends AbstractWidget {
                 isHoveredOrFocused() ? DeckTheme.ACCENT_DARK : DeckTheme.DIVIDER, DeckTheme.FIELD);
         graphics.text(DeckFonts.ui(), option.displayNameText().component(), getX() + 10, getY() + 10,
                 DeckTheme.TEXT, false);
-        DeckIcons.draw(graphics, option.value() ? DeckIcons.Icon.CHEVRON_UP : DeckIcons.Icon.CHEVRON_DOWN,
+        DeckIcons.draw(graphics, option.draftValue() ? DeckIcons.Icon.CHEVRON_UP : DeckIcons.Icon.CHEVRON_DOWN,
                 getRight() - 20, getY() + 7, 14, DeckTheme.TEXT_SECONDARY);
     }
 

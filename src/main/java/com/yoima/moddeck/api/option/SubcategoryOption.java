@@ -31,6 +31,11 @@ public final class SubcategoryOption extends ConfigOption<Boolean> {
 
     @Override public void reset() { children.forEach(ConfigOption::reset); }
 
+    @Override public void discardChanges() {
+        super.discardChanges();
+        children.forEach(ConfigOption::discardChanges);
+    }
+
     @Override public void notifySaved() { children.forEach(ConfigOption::notifySaved); }
 
     public static final class Builder {

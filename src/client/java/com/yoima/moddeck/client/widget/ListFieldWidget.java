@@ -1,59 +1,41 @@
 package com.yoima.moddeck.client.widget;
 
 import com.yoima.moddeck.api.option.ListOption;
+import com.yoima.moddeck.client.screen.ListEditorScreen;
+import com.yoima.moddeck.client.theme.DeckFonts;
 import com.yoima.moddeck.client.theme.DeckTheme;
-import java.util.ArrayList;
-import java.util.List;
-import net.minecraft.client.gui.Font;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.narration.NarrationElementOutput;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.network.chat.Component;
 
-/** Compact list editor; semicolons delimit elements and a backslash escapes delimiters. */
-public final class ListFieldWidget<T> extends EditBox {
-    private static final int TEXT_INSET = 11;
-    public ListFieldWidget(Font font, int x, int y, int width, ListOption<T> option, Runnable onChanged) {
-        super(font, x, y, width, 28, option.displayNameText().component());
-        setBordered(false);
-        setMaxLength(4096);
-        setValue(option.value().stream().map(option::encodeElement).map(ListFieldWidget::escape)
-                .reduce((left, right) -> left + "; " + right).orElse(""));
-        setResponder(value -> {
-            List<String> encoded = split(value).stream().map(String::strip).toList();
-            if (option.tryDecodeAndSet(encoded)) onChanged.run();
-        });
+/** Compact summary that opens the full list editor without crowding the main option row. */
+public final class ListFieldWidget<T> extends AbstractWidget {
+    private final ListOption<T> option;
+    private final Runnable onChanged;
+
+    public ListFieldWidget(net.minecraft.client.gui.Font font, int x, int y, int width,
+                           ListOption<T> option, Runnable onChanged) {
+        super(x, y, width, 28, option.displayNameText().component());
+        this.option = option;
+        this.onChanged = onChanged;
         active = option.editable();
     }
 
-    @Override public void extractWidgetRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
+    @Override public void onClick(MouseButtonEvent event, boolean doubleClick) {
+        Minecraft minecraft = Minecraft.getInstance();
+        minecraft.setScreenAndShow(new ListEditorScreen<>(minecraft.gui.screen(), option, onChanged));
+    }
+
+    @Override protected void extractWidgetRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
         DeckTheme.border(graphics, getX(), getY(), getWidth(), getHeight(), 5,
-                isFocused() ? DeckTheme.ACCENT_DARK : DeckTheme.DIVIDER, DeckTheme.FIELD);
-        graphics.pose().pushMatrix();
-        graphics.pose().translate(TEXT_INSET, (getHeight() - 8) / 2.0f);
-        super.extractWidgetRenderState(graphics, mouseX, mouseY, delta);
-        graphics.pose().popMatrix();
+                isHoveredOrFocused() ? DeckTheme.ACCENT_DARK : DeckTheme.DIVIDER, DeckTheme.FIELD);
+        String summary = Component.translatable("moddeck.list.summary", option.draftValue().size()).getString();
+        graphics.text(DeckFonts.ui(), summary, getX() + 11, getY() + 10, DeckTheme.TEXT, false);
+        graphics.text(DeckFonts.ui(), "›", getX() + getWidth() - 16, getY() + 9, DeckTheme.TEXT_SECONDARY, false);
     }
 
-    @Override public void onClick(net.minecraft.client.input.MouseButtonEvent event, boolean doubleClick) {
-        super.onClick(new net.minecraft.client.input.MouseButtonEvent(
-                event.x() - TEXT_INSET, event.y(), event.buttonInfo()), doubleClick);
-    }
-
-    private static String escape(String value) { return value.replace("\\", "\\\\").replace(";", "\\;"); }
-
-    private static List<String> split(String value) {
-        if (value.isBlank()) return List.of();
-        List<String> result = new ArrayList<>();
-        StringBuilder current = new StringBuilder();
-        boolean escaped = false;
-        for (int index = 0; index < value.length(); index++) {
-            char character = value.charAt(index);
-            if (escaped) { current.append(character); escaped = false; }
-            else if (character == '\\') escaped = true;
-            else if (character == ';') { result.add(current.toString()); current.setLength(0); }
-            else current.append(character);
-        }
-        if (escaped) current.append('\\');
-        result.add(current.toString());
-        return result;
-    }
+    @Override protected void updateWidgetNarration(NarrationElementOutput output) { defaultButtonNarrationText(output); }
 }

@@ -42,21 +42,23 @@ public final class KeybindWidget extends AbstractWidget {
             return true;
         }
         if (!option.allows(KeybindOption.InputType.KEYBOARD)) return true;
-        finish(InputConstants.getKey(event).getName());
+        String key = InputConstants.getKey(event).getName();
+        finish(option.allowsModifiers() ? withModifiers(key, event.modifiers()) : key);
         return true;
     }
 
     public boolean captureMouse(MouseButtonEvent event) {
         if (!listening) return false;
         if (option.allows(KeybindOption.InputType.MOUSE)) {
-            finish(InputConstants.Type.MOUSE.getOrCreate(event.button()).getName());
+            String key = InputConstants.Type.MOUSE.getOrCreate(event.button()).getName();
+            finish(option.allowsModifiers() ? withModifiers(key, event.modifiers()) : key);
         }
         // Consume unsupported mouse input while listening so it cannot activate another control.
         return true;
     }
 
     private void finish(String key) {
-        if (option.trySetValue(key)) {
+        if (option.trySetDraftValue(key)) {
             listening = false;
             setFocused(false);
             onChanged.run();
@@ -68,8 +70,35 @@ public final class KeybindWidget extends AbstractWidget {
                 listening ? DeckTheme.ACCENT : DeckTheme.DIVIDER, DeckTheme.FIELD);
         Component value = listening ? Component.translatable("moddeck.keybind.press_input")
                 : option.isUnbound() ? Component.translatable("moddeck.keybind.unbound")
-                : InputConstants.getKey(option.value()).getDisplayName();
+                : displayChord(option.draftValue());
         graphics.centeredText(DeckFonts.ui(), value, getX() + getWidth() / 2, getY() + 10, DeckTheme.TEXT);
+    }
+
+    private static String withModifiers(String key, int modifiers) {
+        StringBuilder chord = new StringBuilder();
+        if ((modifiers & GLFW.GLFW_MOD_CONTROL) != 0) chord.append("control+");
+        if ((modifiers & GLFW.GLFW_MOD_SHIFT) != 0) chord.append("shift+");
+        if ((modifiers & GLFW.GLFW_MOD_ALT) != 0) chord.append("alt+");
+        if ((modifiers & GLFW.GLFW_MOD_SUPER) != 0) chord.append("super+");
+        return chord.append(key).toString();
+    }
+
+    private static Component displayChord(String chord) {
+        String[] parts = chord.split("\\+");
+        StringBuilder label = new StringBuilder();
+        for (int index = 0; index < parts.length - 1; index++) {
+            if (!label.isEmpty()) label.append(" + ");
+            label.append(switch (parts[index]) {
+                case "control" -> "Ctrl";
+                case "shift" -> "Shift";
+                case "alt" -> "Alt";
+                case "super" -> "Super";
+                default -> parts[index];
+            });
+        }
+        if (!label.isEmpty()) label.append(" + ");
+        label.append(InputConstants.getKey(KeybindOption.baseKey(chord)).getDisplayName().getString());
+        return Component.literal(label.toString());
     }
 
     @Override protected void updateWidgetNarration(NarrationElementOutput output) { defaultButtonNarrationText(output); }

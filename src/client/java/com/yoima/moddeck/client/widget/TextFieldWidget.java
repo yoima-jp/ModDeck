@@ -14,11 +14,11 @@ public final class TextFieldWidget extends EditBox {
         super(font, x, y, width, 28, option.displayNameText().component());
         setBordered(false);
         setMaxLength(option.maximumLength());
-        setValue(option.value());
+        setValue(option.draftValue());
         setTextColor(DeckTheme.TEXT);
         setTextColorUneditable(DeckTheme.TEXT_MUTED);
         setResponder(value -> {
-            if (option.trySetValue(value)) onChanged.run();
+            if (option.trySetDraftValue(value)) onChanged.run();
         });
         active = option.editable();
     }

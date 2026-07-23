@@ -24,19 +24,19 @@ public final class SliderWidget extends AbstractSliderButton {
     private String editingBuffer = "";
 
     public SliderWidget(int x, int y, int width, IntegerOption option, Runnable onChanged) {
-        this(x, y, width, option, option.minimum(), option.maximum(), option.value(), onChanged);
+        this(x, y, width, option, option.minimum(), option.maximum(), option.draftValue(), onChanged);
     }
 
     public SliderWidget(int x, int y, int width, DoubleOption option, Runnable onChanged) {
-        this(x, y, width, option, option.minimum(), option.maximum(), option.value(), onChanged);
+        this(x, y, width, option, option.minimum(), option.maximum(), option.draftValue(), onChanged);
     }
 
     public SliderWidget(int x, int y, int width, LongOption option, Runnable onChanged) {
-        this(x, y, width, option, option.minimum(), option.maximum(), option.value(), onChanged);
+        this(x, y, width, option, option.minimum(), option.maximum(), option.draftValue(), onChanged);
     }
 
     public SliderWidget(int x, int y, int width, FloatOption option, Runnable onChanged) {
-        this(x, y, width, option, option.minimum(), option.maximum(), option.value(), onChanged);
+        this(x, y, width, option, option.minimum(), option.maximum(), option.draftValue(), onChanged);
     }
 
     private SliderWidget(int x, int y, int width, ConfigOption<?> option, double minimum, double maximum,
@@ -76,7 +76,7 @@ public final class SliderWidget extends AbstractSliderButton {
         if (event.x() >= valueFieldX()) {
             editing = true;
             replaceOnType = true;
-            editingBuffer = getMessage().getString();
+            editingBuffer = format(option.draftValue() instanceof Number number ? number.doubleValue() : 0);
             setFocused(true);
             return;
         }
@@ -139,19 +139,19 @@ public final class SliderWidget extends AbstractSliderButton {
     }
 
     @Override protected void updateMessage() {
-        setMessage(Component.literal(format(option.value() instanceof Number number ? number.doubleValue() : 0)));
+        setMessage(option.formattedDraftValue().component());
     }
 
     @Override protected void applyValue() {
         double raw = minimum + value * (maximum - minimum);
         if (option instanceof IntegerOption integer) {
-            integer.trySetValue((int) Math.round(raw));
+            integer.trySetDraftValue((int) Math.round(raw));
         } else if (option instanceof LongOption longOption) {
-            longOption.trySetValue(Math.round(raw));
+            longOption.trySetDraftValue(Math.round(raw));
         } else if (option instanceof FloatOption floatOption) {
-            floatOption.trySetValue((float) raw);
+            floatOption.trySetDraftValue((float) raw);
         } else if (option instanceof DoubleOption decimal) {
-            decimal.trySetValue(raw);
+            decimal.trySetDraftValue(raw);
         }
         updateMessage();
         onChanged.run();
@@ -187,15 +187,15 @@ public final class SliderWidget extends AbstractSliderButton {
             double parsed = Double.parseDouble(editingBuffer);
             double clamped = Math.max(minimum, Math.min(maximum, parsed));
             if (option instanceof IntegerOption integer) {
-                integer.setValue((int) Math.round(clamped));
+                integer.setDraftValue((int) Math.round(clamped));
             } else if (option instanceof LongOption longOption) {
-                longOption.setValue(Math.round(clamped));
+                longOption.setDraftValue(Math.round(clamped));
             } else if (option instanceof FloatOption floatOption) {
-                floatOption.setValue((float) clamped);
+                floatOption.setDraftValue((float) clamped);
             } else if (option instanceof DoubleOption decimal) {
-                decimal.setValue(clamped);
+                decimal.setDraftValue(clamped);
             }
-            value = normalize(((Number) option.value()).doubleValue(), minimum, maximum);
+            value = normalize(((Number) option.draftValue()).doubleValue(), minimum, maximum);
             updateMessage();
             onChanged.run();
         } catch (IllegalArgumentException ignored) {

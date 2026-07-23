@@ -21,16 +21,16 @@ public final class SwitchWidget extends AbstractWidget {
     }
 
     @Override public void onClick(MouseButtonEvent event, boolean doubleClick) {
-        if (option.trySetValue(!option.value())) onChanged.run();
+        if (option.trySetDraftValue(!option.draftValue())) onChanged.run();
     }
 
     @Override protected void extractWidgetRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
-        int track = option.value() ? DeckTheme.ACCENT_DARK : DeckTheme.FIELD;
-        if (isHoveredOrFocused()) track = option.value() ? DeckTheme.ACCENT : DeckTheme.FIELD_HOVER;
+        int track = option.draftValue() ? DeckTheme.ACCENT_DARK : DeckTheme.FIELD;
+        if (isHoveredOrFocused()) track = option.draftValue() ? DeckTheme.ACCENT : DeckTheme.FIELD_HOVER;
         DeckTheme.roundedRect(graphics, getX(), getY(), getWidth(), getHeight(), 9, track);
-        int knobX = option.value() ? getX() + 19 : getX() + 3;
+        int knobX = option.draftValue() ? getX() + 19 : getX() + 3;
         DeckTheme.roundedRect(graphics, knobX, getY() + 3, 12, 12, 6,
-                option.value() ? DeckTheme.TEXT : DeckTheme.TEXT_SECONDARY);
+                option.draftValue() ? DeckTheme.TEXT : DeckTheme.TEXT_SECONDARY);
     }
 
     @Override protected void updateWidgetNarration(NarrationElementOutput output) {

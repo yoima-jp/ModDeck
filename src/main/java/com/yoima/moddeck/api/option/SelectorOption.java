@@ -32,6 +32,7 @@ public final class SelectorOption<T> extends ConfigOption<T> {
     }
 
     @Override public Object encode() { return codec.encode(value()); }
+    @Override public Object encodeDraft() { return codec.encode(draftValue()); }
 
     @Override protected T validate(T value) {
         if (!choices.contains(value)) throw new IllegalArgumentException("Unknown selector value for " + id());
