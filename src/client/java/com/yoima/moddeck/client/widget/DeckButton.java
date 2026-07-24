@@ -42,12 +42,12 @@ public final class DeckButton extends AbstractWidget {
         if (style == Style.PRIMARY || style == Style.SECONDARY) {
             DeckIcons.Icon icon = style == Style.PRIMARY ? DeckIcons.Icon.SAVE : DeckIcons.Icon.RESET;
             DeckIcons.draw(graphics, icon, getX() + 10, getY() + 6, 16, DeckTheme.TEXT);
-            graphics.centeredText(font, getMessage(), getX() + getWidth() / 2 + 5,
+            DeckTheme.centeredText(graphics, font, getMessage(), getX() + getWidth() / 2 + 5,
                     getY() + (getHeight() - 8) / 2, DeckTheme.TEXT);
         } else if (style == Style.ICON) {
             DeckIcons.draw(graphics, DeckIcons.Icon.CLOSE, getX() + 6, getY() + 6, 16, DeckTheme.TEXT);
         } else {
-            graphics.centeredText(font, getMessage(), getX() + getWidth() / 2,
+            DeckTheme.centeredText(graphics, font, getMessage(), getX() + getWidth() / 2,
                     getY() + (getHeight() - 8) / 2, DeckTheme.TEXT);
         }
     }

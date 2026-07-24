@@ -1,6 +1,9 @@
 package com.yoima.moddeck.client.theme;
 
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.Font;
+import net.minecraft.network.chat.Component;
+import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.resources.Identifier;
 
@@ -158,5 +161,18 @@ public final class DeckTheme {
         graphics.fill(x + 1, y + 1, x + size - 1, y + grassHeight + 1, 0xFF6DA653);
         graphics.fill(x + size / 2, y + grassHeight + 2, x + size - 2, y + size - 2, 0xFF68452E);
         graphics.fill(x + 3, y + grassHeight + 5, x + 6, y + grassHeight + 8, 0xFF9B7047);
+    }
+
+    /** Centers text without Minecraft's default drop shadow; shadows become distracting in light mode. */
+    public static void centeredText(GuiGraphicsExtractor graphics, Font font, String text,
+                                    int centerX, int y, int color) {
+        graphics.text(font, text, centerX - font.width(text) / 2, y, color, false);
+    }
+
+    /** Centers a component without Minecraft's default drop shadow. */
+    public static void centeredText(GuiGraphicsExtractor graphics, Font font, Component text,
+                                    int centerX, int y, int color) {
+        FormattedCharSequence visual = text.getVisualOrderText();
+        graphics.text(font, visual, centerX - font.width(visual) / 2, y, color, false);
     }
 }

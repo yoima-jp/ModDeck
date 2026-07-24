@@ -64,8 +64,8 @@ Call `allowModifiers(true)` on a `KeybindOption` to accept Ctrl/Shift/Alt/Super 
 capturing input, Escape selects the unbound state instead of closing the parent screen.
 
 Lists open a dedicated editor with add, remove, reorder, size limits, custom new-element suppliers,
-and per-element validation. Colors open a matching RGB or ARGB channel picker. These focused screens
-reuse Mod Deck's cards and controls and return to the same configuration screen.
+and per-element validation. Colors use a compact overlay on the current screen with a hue wheel,
+saturation/value area, RGB/ARGB channel controls, and an explicit Apply action.
 
 Conditional entries use draft values, so dependent controls react while editing:
 
@@ -123,8 +123,8 @@ command. Unknown mod IDs and routes fail immediately instead of opening an empty
 The hub uses a responsive virtual canvas so Minecraft's automatic GUI scale does not collapse the
 desktop-style layout. Its native 26.2 GUI rendering includes:
 
-- searchable installed-mod sidebar and persistent selected-mod details
-- fully mod-defined category tabs, nested subcategories, search, and a fixed action footer
+- installed-Mod search in the sidebar and a separate current-Mod settings search
+- fully mod-defined category tabs, nested subcategories, and a fixed action footer
 - automatic, light, and dark themes with purple selection and focus accents
 - dedicated switch, numeric slider/field, text/list/color/keybind controls, and selectors
 - bundled Noto Sans JP UI typography and Lucide SVG-derived icons

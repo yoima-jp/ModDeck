@@ -69,7 +69,7 @@ public final class SliderWidget extends AbstractSliderButton {
         DeckTheme.border(graphics, valueX, getY(), VALUE_WIDTH, 23, 5,
                 editing ? DeckTheme.ACCENT : DeckTheme.DIVIDER, DeckTheme.FIELD);
         Component displayed = editing ? Component.literal(editingBuffer + "_") : getMessage();
-        graphics.centeredText(font, displayed, valueX + VALUE_WIDTH / 2, getY() + 8, DeckTheme.TEXT);
+        DeckTheme.centeredText(graphics, font, displayed, valueX + VALUE_WIDTH / 2, getY() + 8, DeckTheme.TEXT);
     }
 
     @Override public void onClick(MouseButtonEvent event, boolean doubleClick) {

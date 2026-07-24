@@ -15,11 +15,17 @@ public final class SearchFieldWidget extends EditBox {
     private final Font uiFont;
 
     public SearchFieldWidget(Font font, int x, int y, int width, String value, Consumer<String> responder) {
-        super(font, x, y, width, 30, Component.translatable("moddeck.search"));
+        this(font, x, y, width, value, Component.translatable("moddeck.search"), responder);
+    }
+
+    public SearchFieldWidget(Font font, int x, int y, int width, String value,
+                             Component hint, Consumer<String> responder) {
+        super(font, x, y, width, 30, hint);
         uiFont = font;
         setBordered(false);
+        setTextShadow(false);
         setMaxLength(80);
-        setHint(Component.translatable("moddeck.search"));
+        setHint(hint);
         setTextColor(DeckTheme.TEXT);
         setTextColorUneditable(DeckTheme.TEXT_MUTED);
         setValue(value);
@@ -34,6 +40,9 @@ public final class SearchFieldWidget extends EditBox {
         // entered text, selection, cursor, and hint share the same centered baseline.
         graphics.pose().pushMatrix();
         graphics.pose().translate(TEXT_INSET, (getHeight() - 8) / 2.0f);
+        // EditBox keeps this flag as mutable widget state. Re-assert it at render time so a
+        // theme/widget refresh cannot restore vanilla's black text shadow in the search field.
+        setTextShadow(false);
         super.extractWidgetRenderState(graphics, mouseX, mouseY, delta);
         graphics.pose().popMatrix();
         DeckIcons.draw(graphics, DeckIcons.Icon.SEARCH, getX() + 9,
@@ -44,6 +53,13 @@ public final class SearchFieldWidget extends EditBox {
         // EditBox calculates the caret from its unshifted private textX. Mirror the render inset
         // here so clicking within text still chooses the expected character.
         super.onClick(new MouseButtonEvent(event.x() - TEXT_INSET, event.y(), event.buttonInfo()), doubleClick);
+    }
+
+    @Override
+    public void setTextShadow(boolean ignored) {
+        // The current Mod Deck UI uses flat, high-contrast text. SearchFieldWidget must not
+        // inherit vanilla's shadow when EditBox updates its internal render state.
+        super.setTextShadow(false);
     }
 
     private Font getFont() {

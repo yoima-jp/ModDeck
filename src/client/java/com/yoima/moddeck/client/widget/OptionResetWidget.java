@@ -28,6 +28,10 @@ public final class OptionResetWidget extends AbstractWidget {
     @Override public void onClick(MouseButtonEvent event, boolean doubleClick) {
         option.reset();
         refreshState();
+        // The draft value was just mutated. Ask the screen to rebuild widgets on the next tick
+        // so every widget (sliders, switches, text fields, selectors, keybinds, lists, colors)
+        // is recreated from the current draft. Rebuilding inside child event iteration is unsafe,
+        // so the callback must be deferred rather than immediate.
         onReset.run();
     }
 

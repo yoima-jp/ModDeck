@@ -20,6 +20,8 @@
   "moddeck.save_failed": "Could not save settings",
   "moddeck.subtitle": "Unified mod settings",
   "moddeck.search": "Search settings...",
+  "moddeck.search.mods": "Search mods...",
+  "moddeck.search.settings": "Search this mod...",
   "moddeck.installed": "Installed mods",
   "moddeck.change_key": "Change open key",
   "moddeck.theme.auto": "Auto",

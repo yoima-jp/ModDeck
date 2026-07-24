@@ -12,7 +12,7 @@ import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 
 /** Theme selector with Automatic, Light, and Dark modes. */
-public final class ThemeSelectorWidget extends AbstractWidget {
+public final class ThemeSelectorWidget extends AbstractWidget implements ExpandableOptionWidget {
     private static final int ITEM_HEIGHT = 25;
     private final Consumer<DeckTheme.Mode> onChanged;
     private boolean expanded;
@@ -41,8 +41,10 @@ public final class ThemeSelectorWidget extends AbstractWidget {
         drawMode(graphics, DeckTheme.mode(), getX() + 7, getY() + 6, false);
         DeckIcons.draw(graphics, expanded ? DeckIcons.Icon.CHEVRON_UP : DeckIcons.Icon.CHEVRON_DOWN,
                 getRight() - 18, getY() + 7, 14, DeckTheme.TEXT_SECONDARY);
-        if (!expanded) return;
+    }
 
+    @Override public void extractPopupRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
+        if (!expanded) return;
         int menuY = getBottom() + 3;
         DeckTheme.border(graphics, getX(), menuY, getWidth(), DeckTheme.Mode.values().length * ITEM_HEIGHT,
                 5, DeckTheme.DIVIDER, DeckTheme.PANEL_RAISED);
@@ -81,6 +83,10 @@ public final class ThemeSelectorWidget extends AbstractWidget {
                 && mouseY < menuY + DeckTheme.Mode.values().length * ITEM_HEIGHT;
         if (!isMouseOver(mouseX, mouseY) && !overMenu) expanded = false;
     }
+
+    @Override public void setPopupViewport(int top, int bottom) {}
+
+    @Override public boolean isExpanded() { return expanded; }
 
     private void drawMode(GuiGraphicsExtractor graphics, DeckTheme.Mode mode, int x, int y, boolean menu) {
         DeckIcons.Icon icon = switch (mode) {

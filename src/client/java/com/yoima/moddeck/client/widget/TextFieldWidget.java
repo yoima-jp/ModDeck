@@ -13,6 +13,7 @@ public final class TextFieldWidget extends EditBox {
     public TextFieldWidget(Font font, int x, int y, int width, StringOption option, Runnable onChanged) {
         super(font, x, y, width, 28, option.displayNameText().component());
         setBordered(false);
+        setTextShadow(false);
         setMaxLength(option.maximumLength());
         setValue(option.draftValue());
         setTextColor(DeckTheme.TEXT);

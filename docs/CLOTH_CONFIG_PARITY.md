@@ -27,7 +27,7 @@ their implementation must never be copied into Mod Deck.
 | String field | `StringOption`, maximum length, and custom validation |
 | Enum selector | `EnumOption` with translated value labels |
 | Generic selector/dropdown | `SelectorOption<T>` plus `ValueCodec<T>` and translated labels |
-| RGB and alpha color | `ColorOption` with a Mod Deck RGB/ARGB channel picker and preview |
+| RGB and alpha color | `ColorOption` with an in-place hue-wheel/SV popup and RGB/ARGB controls |
 | Key and modifier key code | Server-safe chord model, keyboard/mouse capture, and `KeyMapping` adapter |
 | Int/long/float/double/string lists | Generic `ListOption<T>`, add/remove/reorder, size and cell validation, and JSON arrays |
 | Subcategory | Recursive, collapsible `SubcategoryOption` with nested storage and search |

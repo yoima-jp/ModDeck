@@ -20,6 +20,8 @@
   "moddeck.save_failed": "設定を保存できませんでした",
   "moddeck.subtitle": "統合Mod設定",
   "moddeck.search": "設定を検索...",
+  "moddeck.search.mods": "Modを検索...",
+  "moddeck.search.settings": "このMod内を検索...",
   "moddeck.installed": "インストール済みMod",
   "moddeck.change_key": "設定を開くキーを変更",
   "moddeck.theme.auto": "自動",

@@ -71,7 +71,7 @@ public final class KeybindWidget extends AbstractWidget {
         Component value = listening ? Component.translatable("moddeck.keybind.press_input")
                 : option.isUnbound() ? Component.translatable("moddeck.keybind.unbound")
                 : displayChord(option.draftValue());
-        graphics.centeredText(DeckFonts.ui(), value, getX() + getWidth() / 2, getY() + 10, DeckTheme.TEXT);
+        DeckTheme.centeredText(graphics, DeckFonts.ui(), value, getX() + getWidth() / 2, getY() + 10, DeckTheme.TEXT);
     }
 
     private static String withModifiers(String key, int modifiers) {

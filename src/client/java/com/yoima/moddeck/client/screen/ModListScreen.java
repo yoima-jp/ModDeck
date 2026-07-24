@@ -34,7 +34,8 @@ public final class ModListScreen extends Screen {
     private final Font uiFont = DeckFonts.ui();
     private List<ConfigDefinition> definitions = List.of();
     private ConfigDefinition selected;
-    private String query = "";
+    private String modQuery = "";
+    private String optionQuery = "";
     private int activeCategory;
     private int firstVisibleCategory;
     private int scrollOffset;
@@ -48,13 +49,15 @@ public final class ModListScreen extends Screen {
     private int optionRowHeight;
     private Component status = Component.empty();
     private DeckButton saveButton;
-    private SearchFieldWidget searchField;
+    private SearchFieldWidget modSearchField;
+    private SearchFieldWidget optionSearchField;
     private float uiScale = 1.0f;
     private int uiWidth;
     private int uiHeight;
     private boolean initialSelectionApplied;
     private Language renderedLanguage;
-    private boolean refocusSearch;
+    private boolean refocusModSearch;
+    private boolean refocusOptionSearch;
     private boolean statusError;
     private ConfigOption<?> hoveredOption;
     private boolean pendingWidgetRebuild;
@@ -104,17 +107,30 @@ public final class ModListScreen extends Screen {
         contentTop = mainTop + (selected != null && selected.categories().size() > 1 ? 102 : 72);
         contentBottom = mainBottom - 44;
 
-        searchField = addRenderableWidget(new SearchFieldWidget(uiFont, MARGIN, 55, sidebarWidth, query, this::updateQuery));
-        if (refocusSearch) {
-            searchField.setFocused(true);
-            searchField.moveCursorToEnd(false);
-            refocusSearch = false;
+        modSearchField = addRenderableWidget(new SearchFieldWidget(uiFont, MARGIN, 55, sidebarWidth,
+                modQuery, Component.translatable("moddeck.search.mods"), this::updateModQuery));
+        if (refocusModSearch) {
+            // Restore Screen-level focus; EditBox#setFocused alone does not always re-establish
+            // this child as the Screen's focused element after a full rebuild.
+            setFocused(modSearchField);
+            modSearchField.moveCursorToEnd(false);
+            refocusModSearch = false;
         }
         addRenderableWidget(new DeckButton(uiWidth - 40, 8, 28, 28, Component.literal("×"),
                 DeckButton.Style.ICON, this::onClose));
-        addRenderableWidget(new ThemeSelectorWidget(uiWidth - 148, 8, 100, this::changeTheme));
 
         if (selected != null) {
+            int optionSearchWidth = optionSearchWidth();
+            optionSearchField = addRenderableWidget(new SearchFieldWidget(uiFont,
+                    mainX + mainWidth - optionSearchWidth - 18, mainTop + 15, optionSearchWidth,
+                    optionQuery, Component.translatable("moddeck.search.settings"), this::updateOptionQuery));
+            if (refocusOptionSearch) {
+                // Restore Screen-level focus so keyboard input reaches the recreated search field
+                // immediately instead of staying on whatever child happened to be rebuilt last.
+                setFocused(optionSearchField);
+                optionSearchField.moveCursorToEnd(false);
+                refocusOptionSearch = false;
+            }
             ConfigCategory category = selected.categories().get(Math.min(activeCategory, selected.categories().size() - 1));
             List<ConfigOption<?>> options = visibleOptions(category);
             renderedOptionIds = options.stream().map(ConfigOption::id).toList();
@@ -133,7 +149,8 @@ public final class ModListScreen extends Screen {
                         continue;
                     }
                     // Rebuilding while Minecraft is iterating child listeners can invalidate that
-                    // iteration. Defer structural changes such as expanding a subcategory.
+                    // iteration. Defer structural changes such as expanding a subcategory or
+                    // resetting an option to the next tick.
                     Runnable changed = option instanceof SubcategoryOption ? this::requestWidgetRebuild : this::markDirty;
                     AbstractWidget widget = OptionWidgetRegistry.create(uiFont, widgetX,
                             y, widgetWidth, option,
@@ -147,7 +164,8 @@ public final class ModListScreen extends Screen {
                     optionWidgets.put(widget, option);
                     if (!(option instanceof SubcategoryOption)) {
                         OptionResetWidget reset = new OptionResetWidget(widgetX - 26,
-                                y + Math.max(0, (optionRowHeight - 22) / 2), option, this::markDirty);
+                                y + Math.max(0, (optionRowHeight - 22) / 2), option,
+                                this::requestWidgetRebuildAndMarkDirty);
                         reset.refreshState();
                         addRenderableWidget(reset);
                     }
@@ -167,6 +185,9 @@ public final class ModListScreen extends Screen {
             addRenderableWidget(new DeckButton(saveX - resetWidth - 8, buttonY,
                     resetWidth, 27, resetText, DeckButton.Style.SECONDARY, this::reset));
         }
+        // Keep the search field at its original position, but append the theme selector after it
+        // so the selector and its popup are rendered above the overlapping header search area.
+        addRenderableWidget(new ThemeSelectorWidget(uiWidth - 148, 8, 100, this::changeTheme));
     }
 
     @Override public void extractBackground(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
@@ -220,6 +241,7 @@ public final class ModListScreen extends Screen {
         for (var child : children()) {
             if (child instanceof ThemeSelectorWidget selector
                     && selector.handleExpandedClick(transformed.x(), transformed.y())) {
+                syncThemePopupState();
                 return true;
             }
         }
@@ -237,7 +259,9 @@ public final class ModListScreen extends Screen {
                 selector.collapseIfOutside(transformed.x(), transformed.y());
             }
         }
-        if (super.mouseClicked(transformed, doubleClick)) return true;
+        boolean handled = super.mouseClicked(transformed, doubleClick);
+        syncThemePopupState();
+        if (handled) return true;
         double mouseX = transformed.x();
         double mouseY = transformed.y();
         int y = 119;
@@ -245,6 +269,7 @@ public final class ModListScreen extends Screen {
             if (mouseX >= MARGIN && mouseX < MARGIN + sidebarWidth && mouseY >= y && mouseY < y + 42) {
                 selected = definition;
                 activeCategory = 0;
+                optionQuery = "";
                 scrollOffset = 0;
                 status = Component.empty();
                 statusError = false;
@@ -329,6 +354,7 @@ public final class ModListScreen extends Screen {
         optionWidgets.forEach((widget, option) -> widget.active = option.editable() && option.isEnabled());
         children().stream().filter(OptionResetWidget.class::isInstance)
                 .map(OptionResetWidget.class::cast).forEach(OptionResetWidget::refreshState);
+        syncThemePopupState();
         List<String> currentIds = selected == null ? List.of()
                 : visibleOptions(selected.categories().get(activeCategory)).stream().map(ConfigOption::id).toList();
         if (renderedLanguage != Language.getInstance() || pendingWidgetRebuild
@@ -336,23 +362,31 @@ public final class ModListScreen extends Screen {
     }
 
     @Override public boolean mouseReleased(MouseButtonEvent event) {
+        for (var child : children()) if (child instanceof ExpandableOptionWidget popup) {
+            popup.handleExpandedRelease();
+        }
         return super.mouseReleased(transform(event));
     }
 
     @Override public boolean mouseDragged(MouseButtonEvent event, double dragX, double dragY) {
-        return super.mouseDragged(transform(event), dragX / uiScale, dragY / uiScale);
+        MouseButtonEvent transformed = transform(event);
+        for (var child : children()) {
+            if (child instanceof ExpandableOptionWidget popup
+                    && popup.handleExpandedDrag(transformed.x(), transformed.y())) return true;
+        }
+        return super.mouseDragged(transformed, dragX / uiScale, dragY / uiScale);
     }
 
     private void drawStaticContent(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
         DeckTheme.logo(graphics, MARGIN + 5, 11, 28);
-        graphics.text(uiFont, "Mod Deck", MARGIN + 41, 16, DeckTheme.TEXT, true);
+        graphics.text(uiFont, "Mod Deck", MARGIN + 41, 16, DeckTheme.TEXT, false);
         graphics.text(uiFont, Component.translatable("moddeck.subtitle"), MARGIN + 41, 29,
                 DeckTheme.TEXT_SECONDARY, false);
         graphics.text(uiFont, Component.translatable("moddeck.installed"), MARGIN + 10, 101,
                 DeckTheme.TEXT_SECONDARY, false);
         String count = Integer.toString(filteredDefinitions().size());
         DeckTheme.roundedRect(graphics, MARGIN + sidebarWidth - 29, 98, 20, 15, 7, DeckTheme.FIELD);
-        graphics.centeredText(uiFont, count, MARGIN + sidebarWidth - 19, 103, DeckTheme.TEXT_SECONDARY);
+        DeckTheme.centeredText(graphics, uiFont, count, MARGIN + sidebarWidth - 19, 103, DeckTheme.TEXT_SECONDARY);
         drawSidebarDefinitions(graphics);
 
         DeckIcons.draw(graphics, DeckIcons.Icon.SETTINGS, MARGIN + 10, uiHeight - 42,
@@ -360,15 +394,16 @@ public final class ModListScreen extends Screen {
         graphics.text(uiFont, Component.translatable("moddeck.change_key"), MARGIN + 39, uiHeight - 37,
                 DeckTheme.TEXT_SECONDARY, false);
         DeckTheme.roundedRect(graphics, MARGIN + sidebarWidth - 42, uiHeight - 43, 30, 25, 5, DeckTheme.FIELD);
-        graphics.centeredText(uiFont, "K", MARGIN + sidebarWidth - 27, uiHeight - 34, DeckTheme.TEXT_SECONDARY);
+        DeckTheme.centeredText(graphics, uiFont, "K", MARGIN + sidebarWidth - 27, uiHeight - 34, DeckTheme.TEXT_SECONDARY);
 
         if (selected == null) {
-            graphics.centeredText(uiFont, Component.translatable("moddeck.empty"),
+            DeckTheme.centeredText(graphics, uiFont, Component.translatable("moddeck.empty"),
                     mainX + mainWidth / 2, uiHeight / 2, DeckTheme.TEXT_MUTED);
             return;
         }
         DeckTheme.modCube(graphics, mainX + 22, mainTop + 15, 38);
-        graphics.text(uiFont, selected.titleText().component(), mainX + 72, mainTop + 18, DeckTheme.TEXT, true);
+        graphics.text(uiFont, fit(selected.titleText().component(),
+                Math.max(80, mainWidth - optionSearchWidth() - 106)), mainX + 72, mainTop + 18, DeckTheme.TEXT, false);
         graphics.text(uiFont, selected.modId(), mainX + 72, mainTop + 34, DeckTheme.TEXT_SECONDARY, false);
         if (!selected.descriptionText().isEmpty()) {
             graphics.text(uiFont, fit(selected.descriptionText().component(), mainWidth - 104), mainX + 72, mainTop + 51,
@@ -403,8 +438,7 @@ public final class ModListScreen extends Screen {
         for (ConfigDefinition definition : filteredDefinitions()) {
             if (y + 42 > bottom) break;
             DeckTheme.modCube(graphics, MARGIN + 11, y + 7, 28);
-            graphics.text(uiFont, definition.titleText().component(), MARGIN + 48, y + 10, DeckTheme.TEXT,
-                    definition == selected);
+            graphics.text(uiFont, definition.titleText().component(), MARGIN + 48, y + 10, DeckTheme.TEXT, false);
             graphics.text(uiFont, definition.modId(), MARGIN + 48, y + 25, DeckTheme.TEXT_SECONDARY, false);
             if (definition == selected) DeckIcons.draw(graphics, DeckIcons.Icon.CHEVRON_RIGHT,
                     MARGIN + sidebarWidth - 24, y + 12, 16, DeckTheme.TEXT);
@@ -425,7 +459,7 @@ public final class ModListScreen extends Screen {
             ConfigCategory category = selected.categories().get(categoryIndex);
             int color = categoryIndex == activeCategory ? DeckTheme.ACCENT : DeckTheme.TEXT_MUTED;
             Component label = category.displayNameText().component();
-            graphics.centeredText(uiFont, fit(label, tabWidth - 12),
+            DeckTheme.centeredText(graphics, uiFont, fit(label, tabWidth - 12),
                     tabX + visibleIndex * tabWidth + tabWidth / 2, tabY + 4, color);
             if (categoryIndex == activeCategory) {
                 graphics.fill(tabX + visibleIndex * tabWidth, mainTop + 94,
@@ -439,7 +473,7 @@ public final class ModListScreen extends Screen {
         ConfigCategory category = selected.categories().get(activeCategory);
         List<ConfigOption<?>> options = visibleOptions(category);
         if (options.isEmpty()) {
-            graphics.centeredText(uiFont, Component.translatable("moddeck.category.empty"),
+            DeckTheme.centeredText(graphics, uiFont, Component.translatable("moddeck.category.empty"),
                     mainX + mainWidth / 2, contentTop + (contentBottom - contentTop) / 2,
                     DeckTheme.TEXT_MUTED);
             return;
@@ -508,12 +542,10 @@ public final class ModListScreen extends Screen {
     }
 
     private List<ConfigDefinition> filteredDefinitions() {
-        if (query.isBlank()) return definitions;
+        if (modQuery.isBlank()) return definitions;
         return definitions.stream().filter(definition -> definition.titleText().component().getString()
-                        .toLowerCase(Locale.ROOT).contains(query)
-                || definition.modId().toLowerCase(Locale.ROOT).contains(query)
-                || definition.categories().stream().flatMap(category -> flattenOptions(category.options(), true).stream())
-                .anyMatch(this::matchesQuery)).toList();
+                        .toLowerCase(Locale.ROOT).contains(modQuery)
+                || definition.modId().toLowerCase(Locale.ROOT).contains(modQuery)).toList();
     }
 
     private void markDirty() {
@@ -577,11 +609,20 @@ public final class ModListScreen extends Screen {
         return uiFont.plainSubstrByWidth(text, Math.max(0, maximumWidth - uiFont.width("…"))) + "…";
     }
 
-    private void updateQuery(String value) {
-        query = value.trim().toLowerCase(Locale.ROOT);
-        if (selected != null && !query.isBlank()) {
+    private void updateModQuery(String value) {
+        // Mod filtering is render-time; just keep the normalized query. The live search field
+        // widget is already showing the typed text and holds its own focus/caret, so do not
+        // call setValue or request a rebuild, which would re-create children and destabilize typing.
+        modQuery = value.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private void updateOptionQuery(String value) {
+        optionQuery = value.trim().toLowerCase(Locale.ROOT);
+        if (selected != null && !optionQuery.isBlank()) {
             for (int index = 0; index < selected.categories().size(); index++) {
-                if (selected.categories().get(index).options().stream().anyMatch(this::matchesQuery)) {
+                ConfigCategory category = selected.categories().get(index);
+                if (category.displayNameText().component().getString().toLowerCase(Locale.ROOT).contains(optionQuery)
+                        || category.options().stream().anyMatch(this::matchesOptionQuery)) {
                     activeCategory = index;
                     ensureActiveCategoryVisible();
                     break;
@@ -589,26 +630,28 @@ public final class ModListScreen extends Screen {
             }
         }
         scrollOffset = 0;
-        refocusSearch = true;
+        // Request exactly one deferred rebuild; do not rebuild synchronously inside the
+        // EditBox responder to avoid recursive widget/focus churn while typing.
+        refocusOptionSearch = true;
         requestWidgetRebuild();
     }
 
     private List<ConfigOption<?>> visibleOptions(ConfigCategory category) {
-        boolean screenMatches = query.isBlank()
-                || selected.titleText().component().getString().toLowerCase(Locale.ROOT).contains(query)
-                || selected.modId().contains(query);
-        List<ConfigOption<?>> flattened = flattenOptions(category.options(), !screenMatches);
-        return screenMatches ? flattened : flattened.stream().filter(this::matchesQuery).toList();
+        List<ConfigOption<?>> flattened = flattenOptions(category.options(), !optionQuery.isBlank());
+        boolean categoryMatches = !optionQuery.isBlank() && category.displayNameText().component().getString()
+                .toLowerCase(Locale.ROOT).contains(optionQuery);
+        return optionQuery.isBlank() || categoryMatches
+                ? flattened : flattened.stream().filter(this::matchesOptionQuery).toList();
     }
 
-    private boolean matchesQuery(ConfigOption<?> option) {
-        return option.displayNameText().component().getString().toLowerCase(Locale.ROOT).contains(query)
-                || option.descriptionText().component().getString().toLowerCase(Locale.ROOT).contains(query)
-                || option.id().contains(query)
+    private boolean matchesOptionQuery(ConfigOption<?> option) {
+        return option.displayNameText().component().getString().toLowerCase(Locale.ROOT).contains(optionQuery)
+                || option.descriptionText().component().getString().toLowerCase(Locale.ROOT).contains(optionQuery)
+                || option.id().contains(optionQuery)
                 || option.searchAliases().stream().map(text -> text.toLowerCase(Locale.ROOT))
-                .anyMatch(alias -> alias.contains(query))
+                .anyMatch(alias -> alias.contains(optionQuery))
                 || option instanceof SubcategoryOption subcategory
-                && flattenOptions(subcategory.children(), true).stream().anyMatch(this::matchesQuery);
+                && flattenOptions(subcategory.children(), true).stream().anyMatch(this::matchesOptionQuery);
     }
 
     private List<ConfigOption<?>> flattenOptions(List<ConfigOption<?>> options, boolean forceExpanded) {
@@ -633,7 +676,29 @@ public final class ModListScreen extends Screen {
         return Math.max(82, uiFont.width(text) + 48);
     }
 
+    private int optionSearchWidth() { return Math.min(210, Math.max(160, mainWidth / 3)); }
+
     private void requestWidgetRebuild() { pendingWidgetRebuild = true; }
+
+    private void requestWidgetRebuildAndMarkDirty() {
+        // Per-entry reset has already mutated the option draft. Mark the screen dirty so the
+        // save button reflects the unsaved change, and schedule a deferred rebuild so every
+        // option widget is recreated from the updated draft on the next safe tick.
+        markDirty();
+        requestWidgetRebuild();
+    }
+
+    private void syncThemePopupState() {
+        if (optionSearchField == null) return;
+        boolean themeExpanded = children().stream().anyMatch(child ->
+                child instanceof ThemeSelectorWidget theme && theme.isExpanded());
+        optionSearchField.visible = !themeExpanded;
+        optionSearchField.active = !themeExpanded;
+        if (themeExpanded && getFocused() == optionSearchField) {
+            optionSearchField.setFocused(false);
+            setFocused(null);
+        }
+    }
 
     private void ensureActiveCategoryVisible() {
         int visible = visibleTabCount();
