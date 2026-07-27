@@ -39,6 +39,8 @@ public final class OptionWidgetRegistry {
                 new ListFieldWidget<>(font, x, y, width, option, changed));
         register(SubcategoryOption.class, (font, x, y, width, option, changed, up) ->
                 new SubcategoryWidget(x, y, width, option, changed));
+        register(ButtonOption.class, (font, x, y, width, option, changed, up) ->
+                new ButtonOptionWidget(x, y, width, option));
     }
 
     private OptionWidgetRegistry() {}

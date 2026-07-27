@@ -41,7 +41,7 @@ translation key. Put translations under the registering mod's own
 when Minecraft reloads the active language.
 
 Built-in entries cover Boolean, Integer, Long, Float, Double, String, Enum, RGB/ARGB Color,
-Keybind, generic List, generic Selector/Dropdown, Slider, description rows, and nested Subcategory
+Keybind, generic List, generic Selector/Dropdown, Slider, action buttons, description rows, and nested Subcategory
 values. Entries also support translated/dynamic tooltips, dynamic defaults, per-entry reset,
 validators, value formatters, search aliases, conditional display/enabling, change callbacks, save
 consumers, read-only state, and restart-required metadata. `SubcategoryOption` recursively applies
@@ -66,6 +66,14 @@ capturing input, Escape selects the unbound state instead of closing the parent 
 Lists open a dedicated editor with add, remove, reorder, size limits, custom new-element suppliers,
 and per-element validation. Colors use a compact overlay on the current screen with a hue wheel,
 saturation/value area, RGB/ARGB channel controls, and an explicit Apply action.
+
+Action buttons run a callback supplied by the registering mod and do not participate in storage or
+dirty-state tracking:
+
+```java
+builder.buttonOption("reload", ConfigText.literal("Reload data"), ConfigText.empty(),
+    ConfigText.literal("Run"), this::reloadData);
+```
 
 Conditional entries use draft values, so dependent controls react while editing:
 

@@ -68,10 +68,18 @@ public final class KeybindWidget extends AbstractWidget {
     @Override protected void extractWidgetRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
         DeckTheme.border(graphics, getX(), getY(), getWidth(), getHeight(), 5,
                 listening ? DeckTheme.ACCENT : DeckTheme.DIVIDER, DeckTheme.FIELD);
-        Component value = listening ? Component.translatable("moddeck.keybind.press_input")
+        Component value = listening ? listeningPrompt()
                 : option.isUnbound() ? Component.translatable("moddeck.keybind.unbound")
                 : displayChord(option.draftValue());
         DeckTheme.centeredText(graphics, DeckFonts.ui(), value, getX() + getWidth() / 2, getY() + 10, DeckTheme.TEXT);
+    }
+
+    private Component listeningPrompt() {
+        boolean keyboard = option.allows(KeybindOption.InputType.KEYBOARD);
+        boolean mouse = option.allows(KeybindOption.InputType.MOUSE);
+        if (keyboard && mouse) return Component.translatable("moddeck.keybind.press_input");
+        if (mouse) return Component.translatable("moddeck.keybind.press_mouse");
+        return Component.translatable("moddeck.keybind.press");
     }
 
     private static String withModifiers(String key, int modifiers) {

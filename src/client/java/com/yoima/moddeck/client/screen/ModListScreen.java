@@ -10,6 +10,7 @@ import com.yoima.moddeck.client.theme.DeckFonts;
 import com.yoima.moddeck.client.theme.DeckIcons;
 import com.yoima.moddeck.client.theme.DeckTheme;
 import com.yoima.moddeck.client.screen.ListEditorPane;
+import com.yoima.moddeck.client.screen.layout.ModListLayout;
 import com.yoima.moddeck.client.widget.*;
 import java.io.IOException;
 import java.util.*;
@@ -18,19 +19,26 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Renderable;
+import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.ConfirmScreen;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.locale.Language;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.FormattedCharSequence;
 
 /** Integrated hub matching the desktop-like Mod Deck reference while remaining a native Screen. */
 public final class ModListScreen extends Screen {
     private static final Logger LOGGER = Logger.getLogger(ModListScreen.class.getName());
     private static final int MARGIN = 14;
     private static final int HEADER_HEIGHT = 42;
-    private static final int ROW_HEIGHT = 50;
+    // The bundled font is roughly 9px tall; 13px leaves a small, readable gap between lines.
+    private static final int DESCRIPTION_LINE_HEIGHT = 13;
+    private static final int CATEGORY_ARROW_SIZE = 24;
+    private static final int CATEGORY_ARROW_GAP = 8;
+    private static final int CATEGORY_TAB_HORIZONTAL_PADDING = 16;
+    private static final int CATEGORY_TAB_MIN_WIDTH = 48;
     private final Screen parent;
     private final String initialModId;
     private final Font uiFont = DeckFonts.ui();
@@ -48,7 +56,7 @@ public final class ModListScreen extends Screen {
     private int mainBottom;
     private int contentTop;
     private int contentBottom;
-    private int optionRowHeight;
+    private int categoryTabsTop;
     private Component status = Component.empty();
     private DeckButton saveButton;
     private SearchFieldWidget modSearchField;
@@ -64,7 +72,11 @@ public final class ModListScreen extends Screen {
     private ConfigOption<?> hoveredOption;
     private boolean pendingWidgetRebuild;
     private final Map<AbstractWidget, ConfigOption<?>> optionWidgets = new IdentityHashMap<>();
+    private List<ConfigOption<?>> renderedOptions = List.of();
+    private List<Integer> renderedRowHeights = List.of();
     private List<String> renderedOptionIds = List.of();
+    private ModListLayout.TabLayout tabLayout = new ModListLayout.TabLayout(List.of(), false, 0, 0,
+            CATEGORY_ARROW_SIZE, CATEGORY_ARROW_GAP);
     private ListOption<?> editingList;
     private ConfigCategory editingListCategory;
     private ListEditorPane listEditorPane;
@@ -109,7 +121,10 @@ public final class ModListScreen extends Screen {
         mainWidth = uiWidth - mainX - MARGIN;
         mainTop = 35;
         mainBottom = uiHeight - 10;
-        contentTop = mainTop + (selected != null && selected.categories().size() > 1 ? 102 : 72);
+        int descriptionBottom = mainTop + 51 + modDescriptionLines().size() * DESCRIPTION_LINE_HEIGHT;
+        categoryTabsTop = Math.max(mainTop + 68, descriptionBottom + 6);
+        contentTop = selected != null && selected.categories().size() > 1
+                ? categoryTabsTop + 34 : Math.max(mainTop + 72, descriptionBottom + 8);
         contentBottom = mainBottom - 44;
 
         modSearchField = addRenderableWidget(new SearchFieldWidget(uiFont, MARGIN, 55, sidebarWidth,
@@ -136,9 +151,31 @@ public final class ModListScreen extends Screen {
                 optionSearchField.moveCursorToEnd(false);
                 refocusOptionSearch = false;
             }
+            // The overflow decision must be made against the full category-row width, not the
+            // arrow-shrunk viewport. Otherwise a previous overflow state would shrink the
+            // available width and could keep overflow true even when the current categories fit.
+            tabLayout = ModListLayout.categoryTabs(
+                    selected.categories().stream().map(ModListScreen::categoryLabel).toList(),
+                    ModListLayout.FontMetrics.of(uiFont),
+                    categoryRowWidth(),
+                    CATEGORY_TAB_MIN_WIDTH,
+                    CATEGORY_TAB_HORIZONTAL_PADDING,
+                    CATEGORY_ARROW_SIZE,
+                    CATEGORY_ARROW_GAP);
+            if (tabLayout.overflow()) {
+                addRenderableWidget(new CategoryScrollButton(mainX + 20, categoryTabsTop, -1));
+                addRenderableWidget(new CategoryScrollButton(mainX + mainWidth - 44, categoryTabsTop, 1));
+            }
             ConfigCategory category = selected.categories().get(Math.min(activeCategory, selected.categories().size() - 1));
             List<ConfigOption<?>> options = visibleOptions(category);
-            renderedOptionIds = options.stream().map(ConfigOption::id).toList();
+            renderedOptions = List.copyOf(options);
+            renderedOptionIds = renderedOptions.stream().map(ConfigOption::id).toList();
+            renderedRowHeights = ModListLayout.rowHeights(
+                    renderedOptions,
+                    ModListLayout.FontMetrics.of(uiFont),
+                    Math.max(90, mainWidth - 60),
+                    Math.max(90, mainWidth / 2 - 45),
+                    DESCRIPTION_LINE_HEIGHT);
             if (editingList != null) {
                 int paneX = mainX + 14;
                 int paneY = contentTop;
@@ -160,17 +197,17 @@ public final class ModListScreen extends Screen {
                 renderedOptionIds = List.of(editingList.id());
             } else {
                 int availableHeight = Math.max(1, contentBottom - contentTop - 8);
-                optionRowHeight = Math.max(42, Math.min(58, availableHeight / Math.max(1, options.size())));
                 int widgetWidth = Math.max(150, Math.min(250, mainWidth * 42 / 100));
                 int widgetX = mainX + mainWidth - widgetWidth - 28;
                 int y = contentTop + 8 - scrollOffset;
-                for (int index = 0; index < options.size(); index++) {
-                    ConfigOption<?> option = options.get(index);
+                for (int index = 0; index < renderedOptions.size(); index++) {
+                    ConfigOption<?> option = renderedOptions.get(index);
+                    int rowHeight = renderedRowHeights.get(index);
                     // A small tolerance absorbs rounding introduced by the virtual-canvas scale so
                     // the final row remains visible instead of requiring a meaningless 4–6px scroll.
-                    if (y >= contentTop && y + optionRowHeight <= contentBottom) {
+                    if (y >= contentTop && y + rowHeight <= contentBottom) {
                         if (option instanceof DescriptionOption) {
-                            y += optionRowHeight;
+                            y += rowHeight;
                             continue;
                         }
                         // Rebuilding while Minecraft is iterating child listeners can invalidate that
@@ -180,7 +217,7 @@ public final class ModListScreen extends Screen {
                         AbstractWidget widget = OptionWidgetRegistry.create(uiFont, widgetX,
                                 y, widgetWidth, option,
                                 changed, false);
-                        widget.setY(y + Math.max(0, (optionRowHeight - widget.getHeight()) / 2));
+                        widget.setY(y + Math.max(0, (rowHeight - widget.getHeight()) / 2));
                         widget.active = option.editable() && option.isEnabled();
                         if (widget instanceof ExpandableOptionWidget popup) {
                             popup.setPopupViewport(contentTop + 3, contentBottom - 3);
@@ -189,13 +226,13 @@ public final class ModListScreen extends Screen {
                         optionWidgets.put(widget, option);
                         if (!(option instanceof SubcategoryOption)) {
                             OptionResetWidget reset = new OptionResetWidget(widgetX - 26,
-                                    y + Math.max(0, (optionRowHeight - 22) / 2), option,
+                                    y + Math.max(0, (rowHeight - 22) / 2), option,
                                     this::requestWidgetRebuildAndMarkDirty);
                             reset.refreshState();
                             addRenderableWidget(reset);
                         }
                     }
-                    y += optionRowHeight;
+                    y += rowHeight;
                 }
             }
 
@@ -221,13 +258,12 @@ public final class ModListScreen extends Screen {
         // part of navigation consistency, while per-mod accent and save policy remain safe options.
         graphics.fill(0, 0, uiWidth, uiHeight, DeckTheme.BACKGROUND);
         graphics.fill(0, 0, uiWidth, HEADER_HEIGHT, DeckTheme.BACKGROUND_TOP);
-        DeckTheme.roundedRect(graphics, MARGIN, 91, sidebarWidth, Math.max(40, uiHeight - 151), 7, DeckTheme.PANEL);
-        DeckTheme.roundedRect(graphics, MARGIN, uiHeight - 51, sidebarWidth, 41, 7, DeckTheme.PANEL);
+        DeckTheme.roundedRect(graphics, MARGIN, 91, sidebarWidth, Math.max(40, uiHeight - 101), 7, DeckTheme.PANEL);
         if (mainWidth > 0) DeckTheme.roundedRect(graphics, mainX, mainTop, mainWidth, mainBottom - mainTop, 8, DeckTheme.PANEL);
         if (selected != null) {
             DeckTheme.roundedRect(graphics, mainX + 14, contentTop, mainWidth - 28,
                     Math.max(20, contentBottom - contentTop), 7, DeckTheme.CARD);
-            graphics.fill(mainX + 14, mainTop + 95, mainX + mainWidth - 14, mainTop + 96, DeckTheme.DIVIDER);
+            graphics.fill(mainX + 14, contentTop - 7, mainX + mainWidth - 14, contentTop - 6, DeckTheme.DIVIDER);
             graphics.fill(mainX + 20, contentBottom, mainX + mainWidth - 20, contentBottom + 1, DeckTheme.DIVIDER);
         }
         drawSelectedSidebarBackground(graphics);
@@ -311,14 +347,16 @@ public final class ModListScreen extends Screen {
             y += 44;
         }
         if (selected != null && selected.categories().size() > 1
-                && mouseY >= mainTop + 68 && mouseY < mainTop + 100) {
-            int tabX = mainX + 20;
+                && mouseY >= categoryTabsTop && mouseY < categoryTabsTop + 32) {
+            int tabX = categoryTabsX();
             int visibleCount = visibleTabCount();
-            int tabWidth = Math.max(1, (mainWidth - 40) / visibleCount);
             for (int visibleIndex = 0; visibleIndex < visibleCount; visibleIndex++) {
                 int categoryIndex = firstVisibleCategory + visibleIndex;
                 if (categoryIndex >= selected.categories().size()) break;
-                if (mouseX >= tabX + visibleIndex * tabWidth && mouseX < tabX + (visibleIndex + 1) * tabWidth) {
+                int tabWidth = tabLayout.overflow()
+                        ? Math.min(tabLayout.widths().get(categoryIndex), categoryTabsWidth())
+                        : tabLayout.widths().get(categoryIndex);
+                if (mouseX >= tabX && mouseX < tabX + tabWidth) {
                     stopListEditing();
                     activeCategory = categoryIndex;
                     scrollOffset = 0;
@@ -327,6 +365,7 @@ public final class ModListScreen extends Screen {
                     rebuildWidgets();
                     return true;
                 }
+                tabX += tabWidth;
             }
         }
         return false;
@@ -336,18 +375,21 @@ public final class ModListScreen extends Screen {
         mouseX /= uiScale;
         mouseY /= uiScale;
         if (listEditorPane != null && listEditorPane.mouseScrolled(mouseX, mouseY, scrollX, scrollY)) return true;
-        if (selected != null && selected.categories().size() > 1 && mouseX >= mainX
-                && mouseY >= mainTop + 68 && mouseY < mainTop + 101) {
+        if (selected != null && selected.categories().size() > 1
+                && mouseX >= categoryTabsX() && mouseX < categoryTabsX() + categoryTabsWidth()
+                && mouseY >= categoryTabsTop && mouseY < categoryTabsTop + 33) {
             int maximum = Math.max(0, selected.categories().size() - visibleTabCount());
             int next = Math.max(0, Math.min(maximum, firstVisibleCategory - (int) Math.signum(scrollY)));
-            if (next != firstVisibleCategory) { firstVisibleCategory = next; return true; }
+            if (next != firstVisibleCategory) { firstVisibleCategory = next; ensureActiveCategoryVisible(); return true; }
         }
         if (selected == null || mouseX < mainX || mouseY < contentTop || mouseY > contentBottom) {
             return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
         }
-        // Include the list's top/bottom breathing room in the scroll range. Without it, the last
-        // row can stop underneath the fixed footer and never become fully interactive.
-        int contentHeight = visibleOptions(selected.categories().get(activeCategory)).size() * optionRowHeight + 16;
+        // Scroll range must come from the same renderedOptions/renderedRowHeights snapshot that
+        // drawing and widget placement use. Recomputing visibleOptions here would allow a
+        // subcategory expansion or displayedWhen toggle to change the option count mid-frame,
+        // making the maximum disagree with the actual rendered rows.
+        int contentHeight = renderedRowHeights.stream().mapToInt(Integer::intValue).sum() + 16;
         int maximum = Math.max(0, contentHeight - (contentBottom - contentTop));
         int next = Math.max(0, Math.min(maximum, scrollOffset - (int) Math.round(scrollY * 26)));
         if (next == scrollOffset) return false;
@@ -435,13 +477,6 @@ public final class ModListScreen extends Screen {
         DeckTheme.centeredText(graphics, uiFont, count, MARGIN + sidebarWidth - 19, 103, DeckTheme.TEXT_SECONDARY);
         drawSidebarDefinitions(graphics);
 
-        DeckIcons.draw(graphics, DeckIcons.Icon.SETTINGS, MARGIN + 10, uiHeight - 42,
-                20, DeckTheme.TEXT_SECONDARY);
-        graphics.text(uiFont, Component.translatable("moddeck.change_key"), MARGIN + 39, uiHeight - 37,
-                DeckTheme.TEXT_SECONDARY, false);
-        DeckTheme.roundedRect(graphics, MARGIN + sidebarWidth - 42, uiHeight - 43, 30, 25, 5, DeckTheme.FIELD);
-        DeckTheme.centeredText(graphics, uiFont, "K", MARGIN + sidebarWidth - 27, uiHeight - 34, DeckTheme.TEXT_SECONDARY);
-
         if (selected == null) {
             DeckTheme.centeredText(graphics, uiFont, Component.translatable("moddeck.empty"),
                     mainX + mainWidth / 2, uiHeight / 2, DeckTheme.TEXT_MUTED);
@@ -451,8 +486,9 @@ public final class ModListScreen extends Screen {
         graphics.text(uiFont, fit(selected.titleText().component(),
                 Math.max(80, mainWidth - optionSearchWidth() - 106)), mainX + 72, mainTop + 18, DeckTheme.TEXT, false);
         graphics.text(uiFont, selected.modId(), mainX + 72, mainTop + 34, DeckTheme.TEXT_SECONDARY, false);
-        if (!selected.descriptionText().isEmpty()) {
-            graphics.text(uiFont, fit(selected.descriptionText().component(), mainWidth - 104), mainX + 72, mainTop + 51,
+        List<FormattedCharSequence> descLines = modDescriptionLines();
+        for (int i = 0; i < descLines.size(); i++) {
+            graphics.text(uiFont, descLines.get(i), mainX + 72, mainTop + 51 + i * DESCRIPTION_LINE_HEIGHT,
                     DeckTheme.TEXT_SECONDARY, false);
         }
         drawTabs(graphics);
@@ -471,7 +507,6 @@ public final class ModListScreen extends Screen {
         for (ConfigDefinition definition : filteredDefinitions()) {
             if (definition == selected) {
                 DeckTheme.roundedRect(graphics, MARGIN + 1, y, sidebarWidth - 2, 42, 6, DeckTheme.ACCENT_MUTED);
-                graphics.fill(MARGIN + 1, y + 5, MARGIN + 3, y + 37, DeckTheme.ACCENT);
             }
             y += 44;
         }
@@ -479,7 +514,7 @@ public final class ModListScreen extends Screen {
 
     private void drawSidebarDefinitions(GuiGraphicsExtractor graphics) {
         int y = 119;
-        int bottom = uiHeight - 60;
+        int bottom = uiHeight - 16;
         graphics.enableScissor(MARGIN, 115, MARGIN + sidebarWidth, bottom);
         for (ConfigDefinition definition : filteredDefinitions()) {
             if (y + 42 > bottom) break;
@@ -494,32 +529,36 @@ public final class ModListScreen extends Screen {
     }
 
     private void drawTabs(GuiGraphicsExtractor graphics) {
-        if (selected.categories().size() <= 1) return;
-        int tabX = mainX + 20;
-        int tabY = mainTop + 71;
+        if (selected == null || selected.categories().size() <= 1) return;
+        int tabX = categoryTabsX();
+        int tabY = categoryTabsTop + 3;
         int visibleCount = visibleTabCount();
-        int tabWidth = Math.max(1, (mainWidth - 40) / visibleCount);
+        List<Integer> widths = tabLayout.widths();
         for (int visibleIndex = 0; visibleIndex < visibleCount; visibleIndex++) {
             int categoryIndex = firstVisibleCategory + visibleIndex;
             if (categoryIndex >= selected.categories().size()) break;
             ConfigCategory category = selected.categories().get(categoryIndex);
             int color = categoryIndex == activeCategory ? DeckTheme.ACCENT : DeckTheme.TEXT_MUTED;
+            int naturalWidth = widths.get(categoryIndex);
+            int effectiveWidth = tabLayout.overflow() ? Math.min(naturalWidth, categoryTabsWidth()) : naturalWidth;
             Component label = category.displayNameText().component();
-            DeckTheme.centeredText(graphics, uiFont, fit(label, tabWidth - 12),
-                    tabX + visibleIndex * tabWidth + tabWidth / 2, tabY + 4, color);
+            String fitted = (tabLayout.overflow() && effectiveWidth < naturalWidth)
+                    ? fit(label, effectiveWidth - CATEGORY_TAB_HORIZONTAL_PADDING)
+                    : label.getString();
+            DeckTheme.centeredText(graphics, uiFont, fitted,
+                    tabX + effectiveWidth / 2, tabY + 4, color);
             if (categoryIndex == activeCategory) {
-                graphics.fill(tabX + visibleIndex * tabWidth, mainTop + 94,
-                        tabX + (visibleIndex + 1) * tabWidth - 8, mainTop + 96, DeckTheme.ACCENT);
+                graphics.fill(tabX, categoryTabsTop + 26, tabX + effectiveWidth - 8,
+                        categoryTabsTop + 28, DeckTheme.ACCENT);
             }
+            tabX += effectiveWidth;
         }
     }
 
     private void drawOptionLabels(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
         hoveredOption = null;
         if (editingList != null) return;
-        ConfigCategory category = selected.categories().get(activeCategory);
-        List<ConfigOption<?>> options = visibleOptions(category);
-        if (options.isEmpty()) {
+        if (renderedOptions.isEmpty()) {
             DeckTheme.centeredText(graphics, uiFont, Component.translatable("moddeck.category.empty"),
                     mainX + mainWidth / 2, contentTop + (contentBottom - contentTop) / 2,
                     DeckTheme.TEXT_MUTED);
@@ -527,12 +566,19 @@ public final class ModListScreen extends Screen {
         }
         int y = contentTop + 8 - scrollOffset;
         graphics.enableScissor(mainX + 14, contentTop, mainX + mainWidth - 14, contentBottom);
-        for (int index = 0; index < options.size(); index++) {
-            ConfigOption<?> option = options.get(index);
-            if (y + optionRowHeight > contentTop && y < contentBottom) {
+        for (int index = 0; index < renderedOptions.size(); index++) {
+            ConfigOption<?> option = renderedOptions.get(index);
+            int rowHeight = renderedRowHeights.get(index);
+            if (y + rowHeight > contentTop && y < contentBottom) {
                 if (option instanceof DescriptionOption) {
-                    graphics.text(uiFont, fit(option.displayNameText().component(), mainWidth - 60),
-                            mainX + 30, y + 19, DeckTheme.TEXT_SECONDARY, false);
+                    List<FormattedCharSequence> lines = uiFont.split(option.displayNameText().component(),
+                            Math.max(90, mainWidth - 60));
+                    int textHeight = lines.size() * DESCRIPTION_LINE_HEIGHT;
+                    int textY = y + Math.max(0, (rowHeight - textHeight) / 2);
+                    for (int line = 0; line < lines.size(); line++) {
+                        graphics.text(uiFont, lines.get(line), mainX + 30,
+                                textY + line * DESCRIPTION_LINE_HEIGHT, DeckTheme.TEXT_SECONDARY, false);
+                    }
                 } else {
                 int labelColor = option.isEnabled() ? DeckTheme.TEXT : DeckTheme.TEXT_MUTED;
                 graphics.text(uiFont, option.displayNameText().component(), mainX + 30, y + 13, labelColor, false);
@@ -541,25 +587,31 @@ public final class ModListScreen extends Screen {
                             mainX + 36 + uiFont.width(option.displayNameText().component()), y + 13,
                             DeckTheme.TEXT_MUTED, false);
                 }
+                int descY = y + 28;
                 if (option.validationError().isPresent()) {
-                    graphics.text(uiFont, fit(option.validationError().orElseThrow().component(),
-                                    Math.max(90, mainWidth / 2 - 45)),
-                            mainX + 30, y + 28, 0xFFFF9E9E, false);
+                    for (FormattedCharSequence line : uiFont.split(option.validationError().orElseThrow().component(),
+                            Math.max(90, mainWidth / 2 - 45))) {
+                        graphics.text(uiFont, line, mainX + 30, descY, 0xFFFF9E9E, false);
+                        descY += DESCRIPTION_LINE_HEIGHT;
+                    }
                 } else if (!option.descriptionText().isEmpty()) {
-                    graphics.text(uiFont, fit(option.descriptionText().component(), Math.max(90, mainWidth / 2 - 45)),
-                            mainX + 30, y + 28, DeckTheme.TEXT_SECONDARY, false);
+                    for (FormattedCharSequence line : uiFont.split(option.descriptionText().component(),
+                            Math.max(90, mainWidth / 2 - 45))) {
+                        graphics.text(uiFont, line, mainX + 30, descY, DeckTheme.TEXT_SECONDARY, false);
+                        descY += DESCRIPTION_LINE_HEIGHT;
+                    }
                 }
                 }
-                if (index < options.size() - 1) {
-                    graphics.fill(mainX + 30, y + optionRowHeight - 1, mainX + mainWidth - 30,
-                            y + optionRowHeight, DeckTheme.DIVIDER);
+                if (index < renderedOptions.size() - 1) {
+                    graphics.fill(mainX + 30, y + rowHeight - 1, mainX + mainWidth - 30,
+                            y + rowHeight, DeckTheme.DIVIDER);
                 }
                 if (mouseX >= mainX + 20 && mouseX < mainX + mainWidth - 20
-                        && mouseY >= y && mouseY < y + optionRowHeight && !option.tooltips().isEmpty()) {
+                        && mouseY >= y && mouseY < y + rowHeight && !option.tooltips().isEmpty()) {
                     hoveredOption = option;
                 }
             }
-            y += optionRowHeight;
+            y += rowHeight;
         }
         graphics.disableScissor();
     }
@@ -570,12 +622,12 @@ public final class ModListScreen extends Screen {
         if (children().stream().anyMatch(child -> child instanceof AbstractWidget widget
                 && widget.visible && widget.isMouseOver(mouseX, mouseY))) return;
         int maximumTextWidth = Math.min(210, Math.max(120, mainWidth / 3));
-        List<net.minecraft.util.FormattedCharSequence> lines = hoveredOption.tooltips().stream()
+        List<FormattedCharSequence> lines = hoveredOption.tooltips().stream()
                 .flatMap(text -> uiFont.split(text.component(), maximumTextWidth).stream()).toList();
         if (lines.isEmpty()) return;
         int textWidth = lines.stream().mapToInt(uiFont::width).max().orElse(0);
         int boxWidth = textWidth + 16;
-        int boxHeight = lines.size() * 11 + 12;
+        int boxHeight = lines.size() * DESCRIPTION_LINE_HEIGHT + 12;
         int x = Math.min(uiWidth - boxWidth - 6, mouseX + 10);
         int y = mouseY + 9;
         if (y + boxHeight > uiHeight - 6) y = Math.max(6, mouseY - boxHeight - 9);
@@ -583,7 +635,7 @@ public final class ModListScreen extends Screen {
         DeckTheme.border(graphics, x, y, boxWidth, boxHeight, 5,
                 DeckTheme.DIVIDER, DeckTheme.PANEL_RAISED);
         for (int index = 0; index < lines.size(); index++) {
-            graphics.text(uiFont, lines.get(index), x + 8, y + 7 + index * 11,
+            graphics.text(uiFont, lines.get(index), x + 8, y + 7 + index * DESCRIPTION_LINE_HEIGHT,
                     DeckTheme.TEXT_SECONDARY, false);
         }
     }
@@ -715,7 +767,57 @@ public final class ModListScreen extends Screen {
     }
 
     private int visibleTabCount() {
-        return Math.min(selected.categories().size(), Math.max(1, (mainWidth - 40) / 90));
+        if (selected == null || selected.categories().size() <= 1) {
+            return selected == null ? 0 : selected.categories().size();
+        }
+        return tabLayout.overflow()
+                ? ModListLayout.visibleTabCount(tabLayout, firstVisibleCategory, categoryTabsViewportWidth())
+                : selected.categories().size();
+    }
+
+    private boolean categoriesOverflow() {
+        return tabLayout.overflow();
+    }
+
+    private int categoryTabsX() {
+        return mainX + 20 + (tabLayout.overflow() ? CATEGORY_ARROW_SIZE + CATEGORY_ARROW_GAP : 0);
+    }
+
+    /** Full width available for the category tab row before deciding whether arrows are needed. */
+    private int categoryRowWidth() {
+        return Math.max(1, mainWidth - 40);
+    }
+
+    /** Width left for actual tabs once overflow arrows are confirmed and reserved. */
+    private int categoryTabsViewportWidth() {
+        return tabLayout.viewportWidth(CATEGORY_TAB_MIN_WIDTH, CATEGORY_TAB_HORIZONTAL_PADDING);
+    }
+
+    /** Kept for call sites that already expect the arrow-reserved viewport width. */
+    private int categoryTabsWidth() {
+        return categoryTabsViewportWidth();
+    }
+
+    private void ensureActiveCategoryVisible() {
+        int visible = visibleTabCount();
+        if (activeCategory < firstVisibleCategory) firstVisibleCategory = activeCategory;
+        if (activeCategory >= firstVisibleCategory + visible) firstVisibleCategory = activeCategory - visible + 1;
+        int maximum = Math.max(0, selected.categories().size() - visible);
+        firstVisibleCategory = Math.max(0, Math.min(maximum, firstVisibleCategory));
+    }
+
+    private List<FormattedCharSequence> modDescriptionLines() {
+        if (selected == null || selected.descriptionText().isEmpty()) return List.of();
+        return uiFont.split(selected.descriptionText().component(), Math.max(80, mainWidth - 104));
+    }
+
+    private static ModListLayout.Label categoryLabel(ConfigCategory category) {
+        return new ModListLayout.Label() {
+            public String id() { return category.id(); }
+            public net.minecraft.network.chat.FormattedText displayText() {
+                return category.displayNameText().component();
+            }
+        };
     }
 
     public void startListEditing(ListOption<?> option) {
@@ -763,13 +865,33 @@ public final class ModListScreen extends Screen {
         }
     }
 
-    private void ensureActiveCategoryVisible() {
-        int visible = visibleTabCount();
-        if (activeCategory < firstVisibleCategory) firstVisibleCategory = activeCategory;
-        if (activeCategory >= firstVisibleCategory + visible) firstVisibleCategory = activeCategory - visible + 1;
-    }
-
     private MouseButtonEvent transform(MouseButtonEvent event) {
         return new MouseButtonEvent(event.x() / uiScale, event.y() / uiScale, event.buttonInfo());
+    }
+
+    private class CategoryScrollButton extends AbstractWidget {
+        private final int direction;
+        CategoryScrollButton(int x, int y, int direction) {
+            super(x, y, CATEGORY_ARROW_SIZE, CATEGORY_ARROW_SIZE, Component.translatable(
+                    direction < 0 ? "moddeck.category.previous" : "moddeck.category.next"));
+            this.direction = direction;
+            active = direction < 0 ? firstVisibleCategory > 0
+                    : firstVisibleCategory + visibleTabCount() < selected.categories().size();
+        }
+        @Override public void onClick(MouseButtonEvent event, boolean doubleClick) {
+            int visible = visibleTabCount();
+            int maximum = Math.max(0, selected.categories().size() - visible);
+            firstVisibleCategory = Math.max(0, Math.min(maximum, firstVisibleCategory + direction));
+            requestWidgetRebuild();
+        }
+        @Override protected void extractWidgetRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
+            DeckTheme.roundedRect(graphics, getX(), getY(), CATEGORY_ARROW_SIZE, CATEGORY_ARROW_SIZE,
+                    5, isHoveredOrFocused() ? DeckTheme.FIELD_HOVER : DeckTheme.FIELD);
+            DeckIcons.draw(graphics, direction < 0 ? DeckIcons.Icon.CHEVRON_LEFT : DeckIcons.Icon.CHEVRON_RIGHT,
+                    getX() + 4, getY() + 4, 16, DeckTheme.TEXT);
+        }
+        @Override protected void updateWidgetNarration(NarrationElementOutput output) {
+            defaultButtonNarrationText(output);
+        }
     }
 }

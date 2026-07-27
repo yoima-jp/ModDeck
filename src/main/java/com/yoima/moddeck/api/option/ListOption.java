@@ -29,7 +29,6 @@ public final class ListOption<T> extends ConfigOption<List<T>> {
         this.elementCodec = Objects.requireNonNull(elementCodec, "elementCodec");
         this.minimumSize = minimumSize;
         this.maximumSize = maximumSize;
-        this.newElementSupplier = () -> defaultValue.isEmpty() ? null : defaultValue.getFirst();
     }
 
     public int minimumSize() { return minimumSize; }
@@ -39,10 +38,19 @@ public final class ListOption<T> extends ConfigOption<List<T>> {
     public ValidationResult validateElement(T value) {
         return Objects.requireNonNull(elementValidator.validate(value), "element validation result");
     }
+
+    /**
+     * Returns the text with which a new row should begin. An empty string is intentional when
+     * no supplier was configured: editors can show a blank row before the codec can produce a
+     * typed value (for example, before a number has been entered).
+     */
+    public String newElementText() {
+        return newElementSupplier == null ? "" : encodeElement(requireNewElement());
+    }
+
     public T newElement() {
-        T value = newElementSupplier.get();
-        if (value == null) throw new IllegalStateException("No new element supplier configured for " + id());
-        return value;
+        if (newElementSupplier != null) return requireNewElement();
+        return Objects.requireNonNull(decodeElement(""), "decoded blank element");
     }
     public boolean insertionAllowed() { return insertionAllowed; }
     public boolean deletionAllowed() { return deletionAllowed; }
@@ -50,6 +58,10 @@ public final class ListOption<T> extends ConfigOption<List<T>> {
     public ListOption<T> newElementFrom(Supplier<T> supplier) {
         newElementSupplier = Objects.requireNonNull(supplier, "supplier");
         return this;
+    }
+
+    private T requireNewElement() {
+        return Objects.requireNonNull(newElementSupplier.get(), "new element supplier result");
     }
     public ListOption<T> validateElementsWith(ConfigValidator<T> validator) {
         elementValidator = Objects.requireNonNull(validator, "validator");

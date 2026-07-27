@@ -140,6 +140,15 @@ public final class ConfigDefinition {
             return add(new DescriptionOption(id, text));
         }
 
+        public Builder buttonOption(String id, String name, Runnable action) {
+            return buttonOption(id, ConfigText.literal(name), ConfigText.empty(),
+                    ConfigText.literal(name), action);
+        }
+        public Builder buttonOption(String id, ConfigText name, ConfigText description,
+                                    ConfigText buttonText, Runnable action) {
+            return add(new ButtonOption(id, name, description, buttonText, action));
+        }
+
         public Builder booleanOption(String id, String name, boolean defaultValue) {
             return booleanOption(id, name, "", defaultValue);
         }

@@ -13,6 +13,7 @@ public final class SearchFieldWidget extends EditBox {
     private static final int ICON_SIZE = 18;
     private static final int TEXT_INSET = 33;
     private final Font uiFont;
+    private final Component hint;
 
     public SearchFieldWidget(Font font, int x, int y, int width, String value, Consumer<String> responder) {
         this(font, x, y, width, value, Component.translatable("moddeck.search"), responder);
@@ -22,10 +23,14 @@ public final class SearchFieldWidget extends EditBox {
                              Component hint, Consumer<String> responder) {
         super(font, x, y, width, 30, hint);
         uiFont = font;
+        this.hint = hint;
         setBordered(false);
         setTextShadow(false);
         setMaxLength(80);
-        setHint(hint);
+        // Minecraft 26.2 renders EditBox hints through an overload that always enables a text
+        // shadow. That shadow looks like duplicated text on the light palette, so keep the
+        // native hint empty and draw the same accessible message ourselves without a shadow.
+        setHint(Component.empty());
         setTextColor(DeckTheme.TEXT);
         setTextColorUneditable(DeckTheme.TEXT_MUTED);
         setValue(value);
@@ -45,6 +50,10 @@ public final class SearchFieldWidget extends EditBox {
         setTextShadow(false);
         super.extractWidgetRenderState(graphics, mouseX, mouseY, delta);
         graphics.pose().popMatrix();
+        if (getValue().isEmpty() && !isFocused()) {
+            graphics.text(uiFont, hint, getX() + TEXT_INSET,
+                    getY() + (getHeight() - 8) / 2, DeckTheme.TEXT_MUTED, false);
+        }
         DeckIcons.draw(graphics, DeckIcons.Icon.SEARCH, getX() + 9,
                 getY() + (getHeight() - ICON_SIZE) / 2, ICON_SIZE, DeckTheme.TEXT_SECONDARY);
     }

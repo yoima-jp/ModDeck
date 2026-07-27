@@ -3,6 +3,7 @@ package com.yoima.moddeck.api;
 import com.yoima.moddeck.api.option.*;
 import com.yoima.moddeck.api.validation.ValidationResult;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
@@ -19,8 +20,12 @@ class ConfigDefinitionTest {
                 .integerOption("volume", "Volume", 50, 0, 100)
                 .doubleOption("opacity", "Opacity", 0.5, 0, 1)
                 .stringOption("name", "Name", "Player")
-                .enumOption("mode", "Mode", Mode.SIMPLE, Mode.class).build();
+                .enumOption("mode", "Mode", Mode.SIMPLE, Mode.class)
+                .category("feedback", "Feedback")
+                .buttonOption("verify", "Verify", () -> {})
+                .build();
         assertEquals(5, definition.categories().getFirst().options().size());
+        assertEquals(1, definition.categories().get(1).options().size());
         assertEquals("Example description", definition.descriptionText().value());
         IntegerOption volume = (IntegerOption) definition.option("general", "volume").orElseThrow();
         volume.setDraftValue(80);
@@ -108,8 +113,66 @@ class ConfigDefinitionTest {
                 .validateElementsWith(value -> value.isBlank()
                         ? ValidationResult.invalid(ConfigText.literal("Required")) : ValidationResult.success());
         assertEquals("Player", option.newElement());
+        assertEquals("Player", option.newElementText());
         assertFalse(option.trySetDraftValue(List.of("")));
         assertTrue(option.trySetDraftValue(List.of("Alex", "Steve")));
+    }
+
+    @Test void listWithoutNewElementSupplierStartsWithBlankEditableText() {
+        ValueCodec<String> codec = new ValueCodec<>() {
+            @Override public String encode(String value) { return value; }
+            @Override public String decode(String value) { return value; }
+        };
+        ListOption<String> option = new ListOption<>("names", ConfigText.literal("Names"), ConfigText.empty(),
+                List.of(), codec, 0, 3);
+
+        assertEquals("", option.newElementText());
+        assertEquals("", option.newElement());
+
+        ValueCodec<Integer> integerCodec = new ValueCodec<>() {
+            @Override public String encode(Integer value) { return value.toString(); }
+            @Override public Integer decode(String value) { return value.isBlank() ? 0 : Integer.parseInt(value); }
+        };
+        ListOption<Integer> numbers = new ListOption<>("numbers", ConfigText.literal("Numbers"),
+                ConfigText.empty(), List.of(1), integerCodec, 0, 3);
+        assertEquals("", numbers.newElementText());
+        assertEquals(0, numbers.newElement());
+    }
+
+    @Test void listAcceptsBlankNewElementForStringAndNumericCodecs() {
+        ValueCodec<String> stringCodec = new ValueCodec<>() {
+            @Override public String encode(String value) { return value; }
+            @Override public String decode(String value) { return value; }
+        };
+        ListOption<String> strings = new ListOption<>("tags", ConfigText.literal("Tags"), ConfigText.empty(),
+                List.of("a"), stringCodec, 0, 3)
+                .validateElementsWith(value -> value.isBlank()
+                        ? ValidationResult.invalid(ConfigText.literal("Required")) : ValidationResult.success());
+        // newElementText is blank when no supplier is configured, matching the in-game empty row.
+        assertEquals("", strings.newElementText());
+        assertEquals("", strings.newElement());
+        assertTrue(strings.trySetDraftValue(List.of("a", "b")));
+
+        ValueCodec<Integer> integerCodec = new ValueCodec<>() {
+            @Override public String encode(Integer value) { return value.toString(); }
+            @Override public Integer decode(String value) { return value.isBlank() ? 0 : Integer.parseInt(value); }
+        };
+        ListOption<Integer> numbers = new ListOption<>("scores", ConfigText.literal("Scores"), ConfigText.empty(),
+                List.of(10), integerCodec, 0, 3)
+                .validateElementsWith(value -> value < 0 || value > 100
+                        ? ValidationResult.invalid(ConfigText.literal("Range")) : ValidationResult.success());
+        assertEquals("", numbers.newElementText());
+        assertEquals(Integer.valueOf(0), numbers.newElement());
+        assertTrue(numbers.trySetDraftValue(List.of(10, 0)));
+        assertEquals(List.of(10, 0), numbers.draftValue());
+    }
+
+    @Test void keybindCanBeKeyboardOnlyWithoutUnboundOrMouse() {
+        KeybindOption option = new KeybindOption("keyboard_only", ConfigText.literal("Keyboard only"),
+                ConfigText.empty(), "key.keyboard.k", Set.of(KeybindOption.InputType.KEYBOARD), false);
+        assertTrue(option.trySetDraftValue("key.keyboard.l"));
+        assertFalse(option.trySetDraftValue("key.mouse.left"));
+        assertFalse(option.trySetDraftValue(KeybindOption.UNBOUND_KEY));
     }
 
     @Test void preservesTranslationKeysAndExplicitCategoryOrder() {
@@ -127,6 +190,49 @@ class ConfigDefinitionTest {
         assertEquals("translated_mod.config.title", definition.titleText().value());
         assertEquals(List.of("early", "late"), definition.categories().stream().map(ConfigCategory::id).toList());
         assertEquals(ConfigRoute.parse("moddeck:config/translated_mod"), definition.route());
+    }
+
+    @Test void buttonOptionRunsItsActionWithoutBecomingPersistentOrDirty() {
+        AtomicInteger actions = new AtomicInteger();
+        ConfigDefinition definition = ConfigDefinition.builder("button_mod")
+                .category("general", "General")
+                .buttonOption("reload", ConfigText.literal("Reload"), ConfigText.literal("Reload data"),
+                        ConfigText.literal("Run"), actions::incrementAndGet)
+                .build();
+
+        ButtonOption button = (ButtonOption) definition.option("general", "reload").orElseThrow();
+        assertEquals("Run", button.buttonText().value());
+        assertTrue(button.runAction());
+        assertEquals(1, actions.get());
+        assertFalse(button.persistent());
+        assertFalse(definition.isDirty());
+    }
+
+    @Test void buttonOptionContainsCallbackFailures() {
+        ButtonOption button = new ButtonOption("failure", ConfigText.literal("Failure"), ConfigText.empty(),
+                ConfigText.literal("Run"), () -> { throw new IllegalStateException("boom"); });
+
+        assertFalse(button.runAction());
+        assertFalse(button.isDirty());
+    }
+
+    @Test void buttonOptionDoesNotMakeDefinitionDirtyOrPersistent() {
+        AtomicInteger actions = new AtomicInteger();
+        ConfigDefinition definition = ConfigDefinition.builder("feedback_mod")
+                .category("feedback", "Feedback")
+                .buttonOption("verify", ConfigText.literal("Verify"), ConfigText.literal("Log feedback"),
+                        ConfigText.literal("Check"), () -> {
+                            actions.incrementAndGet();
+                            throw new IllegalStateException("expected test failure");
+                        })
+                .build();
+
+        ButtonOption button = (ButtonOption) definition.option("feedback", "verify").orElseThrow();
+        assertFalse(button.persistent());
+        assertFalse(button.isDirty());
+        assertFalse(button.runAction());
+        assertEquals(1, actions.get());
+        assertFalse(definition.isDirty());
     }
 
     @Test void validatesChangesAndInvokesCallbacksAtTheCorrectLifecyclePoint() {

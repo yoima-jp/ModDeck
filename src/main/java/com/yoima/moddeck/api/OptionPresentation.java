@@ -14,5 +14,6 @@ public enum OptionPresentation {
     LIST,
     SUBCATEGORY,
     DESCRIPTION,
+    BUTTON,
     CUSTOM
 }

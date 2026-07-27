@@ -9,16 +9,21 @@ import com.yoima.moddeck.api.validation.ValidationResult;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.logging.Logger;
 
 /** Development catalog exercising every built-in entry and the reusable option metadata APIs. */
 public final class ExampleConfig {
+    private static final Logger LOGGER = Logger.getLogger(ExampleConfig.class.getName());
     private static final ValueCodec<String> STRING_CODEC = new ValueCodec<>() {
         @Override public String encode(String value) { return value; }
         @Override public String decode(String value) { return value; }
     };
     private static final ValueCodec<Integer> INTEGER_CODEC = new ValueCodec<>() {
         @Override public String encode(Integer value) { return value.toString(); }
-        @Override public Integer decode(String value) { return Integer.parseInt(value); }
+        @Override public Integer decode(String value) {
+            if (value == null || value.isBlank()) return 0;
+            return Integer.parseInt(value);
+        }
     };
 
     private ExampleConfig() {}
@@ -102,6 +107,25 @@ public final class ExampleConfig {
                 .add(diagnosticLabel)
                 .build();
 
+        // Intentionally no newElementFrom: verifies blank-row insertion for editable string lists.
+        ListOption<String> blankTags = new ListOption<>("blank_tags", key("option.blank_tags"),
+                key("option.blank_tags.desc"), List.of("sample"), STRING_CODEC, 0, 8)
+                .validateElementsWith(value -> value.isBlank()
+                        ? ValidationResult.invalid(key("validation.blank_tags")) : ValidationResult.success());
+        // Intentionally no newElementFrom: verifies blank-row insertion for editable numeric lists.
+        ListOption<Integer> blankScores = new ListOption<>("blank_scores", key("option.blank_scores"),
+                key("option.blank_scores.desc"), List.of(10), INTEGER_CODEC, 0, 8)
+                .validateElementsWith(value -> value < 0 || value > 100
+                        ? ValidationResult.invalid(key("validation.blank_scores")) : ValidationResult.success());
+        // Keyboard-only keybind that cannot be unbound or assigned to mouse buttons.
+        KeybindOption keyboardOnlyKey = new KeybindOption("keyboard_only_key", key("option.keyboard_only_key"),
+                key("option.keyboard_only_key.desc"), "key.keyboard.n",
+                Set.of(KeybindOption.InputType.KEYBOARD), false);
+        // Keep demonstration feedback in the log so the settings UI does not gain test-only state.
+        ButtonOption verifyButton = new ButtonOption("verify_button", key("option.verify_button"),
+                key("option.verify_button.desc"), key("option.verify_button.label"),
+                () -> LOGGER.info("Example Mod button action completed"));
+
         ConfigScreenApi.register(ConfigDefinition.builder("example_mod")
                 .titleKey("example_mod.config.title")
                 .descriptionKey("example_mod.config.description")
@@ -113,10 +137,16 @@ public final class ExampleConfig {
                 .addOption(volume).addOption(cache).addOption(scale).addOption(opacity).addOption(evenNumber)
                 .categoryKey("choices", "example_mod.category.choices")
                 .addOption(mode).addOption(quality).addOption(actionKey).addOption(menuKey)
+                .addOption(keyboardOnlyKey)
                 .categoryKey("lists", "example_mod.category.lists")
+                .descriptionEntry("lists_hint", key("description.lists"))
                 .addOption(tags).addOption(thresholds).addOption(fixedOrder)
+                .addOption(blankTags).addOption(blankScores)
                 .categoryKey("appearance", "example_mod.category.appearance")
                 .addOption(accent).addOption(overlay).addOption(conditionalColor)
+                .categoryKey("feedback", "example_mod.category.feedback")
+                .descriptionEntry("feedback_hint", key("description.feedback"))
+                .addOption(verifyButton)
                 .categoryKey("advanced", "example_mod.category.advanced")
                 .descriptionEntry("advanced_hint", key("description.advanced"))
                 .addOption(advanced)

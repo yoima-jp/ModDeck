@@ -28,11 +28,19 @@ import net.minecraft.network.chat.Component;
  * ListOption through the standard draft/save flow used by every other Mod Deck entry.
  */
 public final class ListEditorPane {
-    private static final int ROW_HEIGHT = 36;
-    private static final int HANDLE_WIDTH = 26;
+    private static final int PANE_PADDING = 12;
+    private static final int ROW_HEIGHT = 44;
+    private static final int ROW_CARD_HEIGHT = 36;
+    private static final int HANDLE_WIDTH = 24;
     private static final int DELETE_WIDTH = 28;
     private static final int GAP = 8;
     private static final int MAX_STRING_LENGTH = 4096;
+    private static final int DESCRIPTION_LINE_HEIGHT = 13;
+    private static final int BACK_BUTTON_MIN_WIDTH = 80;
+    private static final int BACK_BUTTON_MAX_WIDTH = 220;
+
+    /** A row may exist before its text can be decoded into T; its prior value stays published. */
+    private record PendingElement(String text, Object fallbackValue) {}
 
     private final ListOption<?> option;
     private final ConfigCategory category;
@@ -80,6 +88,7 @@ public final class ListEditorPane {
 
     public void refresh() {
         focusedWidget = null;
+        addButton = null;
         widgets.clear();
         buildHeader();
         buildRows();
@@ -87,20 +96,28 @@ public final class ListEditorPane {
     }
 
     private void buildHeader() {
-        int headerY = contentY + 10;
-        backButton = new DeckButton(contentX, headerY, 90, 26,
-                Component.translatable("moddeck.list.back_to", category.displayNameText().component()),
+        int headerY = contentY + PANE_PADDING;
+        // Show the target ListOption's translated item label in the back button instead of the
+        // category name. The original separate duplicate label is removed from render(); this keeps
+        // the back purpose accessible through the button's message and narration text.
+        Component itemLabel = option.displayNameText().component();
+        int labelWidth = font.width(itemLabel.getString());
+        int available = innerWidth() - 110 - GAP * 2; // reserve space for count badge + margins
+        int backWidth = Math.max(BACK_BUTTON_MIN_WIDTH,
+                Math.min(BACK_BUTTON_MAX_WIDTH, Math.min(available, labelWidth + 44)));
+        backButton = new DeckButton(innerX(), headerY, backWidth, 28,
+                Component.translatable("moddeck.list.back_to", itemLabel),
                 DeckButton.Style.BACK, onBack);
         widgets.add(backButton);
     }
 
     private void buildRows() {
-        int usableWidth = contentWidth - HANDLE_WIDTH - DELETE_WIDTH - GAP * 2;
-        int valueX = contentX + HANDLE_WIDTH + GAP;
-        int y = contentY + 56 - scrollOffset;
+        int usableWidth = innerWidth() - HANDLE_WIDTH - DELETE_WIDTH - GAP * 2;
+        int valueX = innerX() + HANDLE_WIDTH + GAP;
+        int y = rowsTop() - scrollOffset;
         for (int index = 0; index < elements.size(); index++) {
             int rowY = y + index * ROW_HEIGHT;
-            if (rowY + ROW_HEIGHT < contentY + 48 || rowY > contentY + contentHeight - 42) continue;
+            if (rowY + ROW_CARD_HEIGHT < viewportTop() || rowY > viewportBottom()) continue;
             AbstractWidget widget = createElementWidget(valueX, rowY + 4, usableWidth, index);
             if (widget != null) widgets.add(widget);
         }
@@ -108,8 +125,8 @@ public final class ListEditorPane {
 
     private void buildFooter() {
         if (!option.insertionAllowed() || elements.size() >= option.maximumSize()) return;
-        int footerY = contentY + contentHeight - 34;
-        addButton = new DeckButton(contentX + HANDLE_WIDTH + GAP, footerY, 110, 28,
+        int footerY = footerY();
+        addButton = new DeckButton(innerX(), footerY, 110, 28,
                 Component.translatable("moddeck.list.add_entry"), DeckButton.Style.THEME, this::addEntry);
         widgets.add(addButton);
     }
@@ -148,6 +165,9 @@ public final class ListEditorPane {
         @SuppressWarnings({"rawtypes", "unchecked"})
         ListOption rawOption = (ListOption) option;
         ConfigValidator rawValidator = v -> rawOption.validateElement(v);
+        if (value instanceof PendingElement pending) {
+            return createCodecEditor(id, name, description, pending.text());
+        }
         if (value instanceof String s) {
             StringOption opt = new StringOption(id, name, description, s, MAX_STRING_LENGTH);
             opt.validateWith(rawValidator);
@@ -169,23 +189,22 @@ public final class ListEditorPane {
         // Fallback: expose the element as a string using the list's own codec. This keeps any
         // custom codec-backed type editable even when there is no dedicated widget for it.
         ListOption raw = (ListOption) option;
-        String encoded = raw.encodeElement(value);
-        StringOption opt = new StringOption(id, name, description, encoded, MAX_STRING_LENGTH);
-        opt.validateWith(v -> {
-            try {
-                Object decoded = raw.decodeElement((String) v);
-                return raw.validateElement(decoded);
-            } catch (RuntimeException exception) {
-                return ValidationResult.invalid(ConfigText.translatable("moddeck.list.invalid_element"));
-            }
-        });
-        return opt;
+        return createCodecEditor(id, name, description, raw.encodeElement(value));
+    }
+
+    private StringOption createCodecEditor(String id, ConfigText name, ConfigText description,
+                                           String encoded) {
+        // Decoding is deliberately deferred to commitProxyValue. The text widget must accept
+        // intermediate input such as "-" so an incomplete edit survives scrolling/rebuilds.
+        return new StringOption(id, name, description, encoded, MAX_STRING_LENGTH);
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
     private void commitProxyValue(int index, Object originalValue, ConfigOption<?> proxy) {
         Object draftValue = proxy.draftValue();
-        if (originalValue instanceof String || originalValue instanceof Boolean || originalValue instanceof Enum<?>) {
+        if (!(originalValue instanceof PendingElement)
+                && (originalValue instanceof String || originalValue instanceof Boolean
+                || originalValue instanceof Enum<?>)) {
             updateElement(index, draftValue);
             error = Component.empty();
             return;
@@ -198,12 +217,14 @@ public final class ListEditorPane {
             Object decoded = raw.decodeElement((String) draftValue);
             ValidationResult validation = raw.validateElement(decoded);
             if (!validation.valid()) {
+                keepPendingText(index, originalValue, (String) draftValue);
                 error = validation.error().orElseThrow().component();
                 return;
             }
             updateElement(index, decoded);
             error = Component.empty();
         } catch (RuntimeException exception) {
+            keepPendingText(index, originalValue, (String) draftValue);
             error = Component.translatable("moddeck.list.invalid_element");
         }
     }
@@ -211,29 +232,35 @@ public final class ListEditorPane {
     @SuppressWarnings("unchecked")
     private <V> void updateElement(int index, V newValue) {
         elements.set(index, newValue);
-        onChanged.accept(List.copyOf(elements));
-        markDirty.run();
+        publishElements();
     }
 
+    @SuppressWarnings({"rawtypes", "unchecked"})
     private void addEntry() {
         if (!option.insertionAllowed() || elements.size() >= option.maximumSize()) return;
+        String initialText = "";
         try {
-            Object element = option.newElement();
-            elements.add(element);
-            onChanged.accept(List.copyOf(elements));
-            markDirty.run();
-            scrollOffset = Math.max(0, elements.size() * ROW_HEIGHT - (contentHeight - 110));
-            refresh();
+            initialText = option.newElementText();
+            ListOption raw = (ListOption) option;
+            Object decoded = raw.decodeElement(initialText);
+            ValidationResult validation = raw.validateElement(decoded);
+            elements.add(validation.valid() ? decoded : new PendingElement(initialText, null));
         } catch (RuntimeException exception) {
-            error = Component.translatable("moddeck.list.no_default");
+            // Blank input commonly cannot be decoded yet (numbers are the usual case). Keeping
+            // it local lets the user type a complete value without placing null in the API list.
+            elements.add(new PendingElement(initialText, null));
         }
+        publishElements();
+        scrollOffset = Math.max(0, elements.size() * ROW_HEIGHT - viewportHeight());
+        error = Component.empty();
+        refresh();
+        if (elements.getLast() instanceof PendingElement) focusLastElementWidget();
     }
 
     private void deleteEntry(int index) {
         if (!option.deletionAllowed() || elements.size() <= option.minimumSize()) return;
         elements.remove(index);
-        onChanged.accept(List.copyOf(elements));
-        markDirty.run();
+        publishElements();
         refresh();
     }
 
@@ -259,69 +286,77 @@ public final class ListEditorPane {
             return;
         }
         elements.add(adjustedTo, moved);
-        onChanged.accept(List.copyOf(elements));
-        markDirty.run();
+        publishElements();
         draggedIndex = -1;
         dropIndex = -1;
         refresh();
     }
 
     public void render(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
-        int headerY = contentY + 10;
-        graphics.text(font, option.displayNameText().component(), contentX + 102, headerY + 6,
-                DeckTheme.TEXT, false);
+        int headerY = contentY + PANE_PADDING;
+        // The list option label is now carried by the back button itself, so do not duplicate it
+        // beside the button. The count badge and optional description remain visible.
         Component count = Component.translatable("moddeck.list.count", elements.size(), option.maximumSize());
         int countWidth = font.width(count.getString());
-        DeckTheme.roundedRect(graphics, contentX + contentWidth - countWidth - 28, headerY + 2,
+        // Position count immediately to the right of the back button, but never let it overflow
+        // the right edge of the inner pane.
+        int countX = Math.max(backButton.getX() + backButton.getWidth() + GAP,
+                innerX() + innerWidth() - countWidth - 18);
+        DeckTheme.roundedRect(graphics, countX, headerY + 4,
                 countWidth + 18, 20, 5, DeckTheme.FIELD);
-        graphics.text(font, count, contentX + contentWidth - countWidth - 19, headerY + 7,
+        graphics.text(font, count, countX + 9, headerY + 9,
                 DeckTheme.TEXT_SECONDARY, false);
         if (!option.descriptionText().isEmpty()) {
-            graphics.text(font, option.descriptionText().component(), contentX, contentY + 40,
-                    DeckTheme.TEXT_SECONDARY, false);
+            int descWidth = innerWidth();
+            List<net.minecraft.util.FormattedCharSequence> lines = font.split(option.descriptionText().component(), descWidth);
+            int descY = contentY + 48;
+            for (int i = 0; i < lines.size(); i++) {
+                graphics.text(font, lines.get(i), innerX(), descY + i * DESCRIPTION_LINE_HEIGHT,
+                        DeckTheme.TEXT_SECONDARY, false);
+            }
         }
         if (!error.getString().isEmpty()) {
-            graphics.text(font, error, contentX, contentY + contentHeight - 20, 0xFFFF9E9E, false);
+            graphics.text(font, error, innerX() + 122, footerY() + 10, 0xFFFF9E9E, false);
         }
 
-        graphics.enableScissor(contentX, contentY + 48, contentX + contentWidth, contentY + contentHeight - 42);
+        graphics.enableScissor(innerX(), viewportTop(), innerX() + innerWidth(), viewportBottom());
         if (elements.isEmpty()) {
             DeckTheme.centeredText(graphics, font, Component.translatable("moddeck.list.empty"),
-                    contentX + contentWidth / 2, contentY + 48 + (contentHeight - 90) / 2,
+                    innerX() + innerWidth() / 2, viewportTop() + viewportHeight() / 2,
                     DeckTheme.TEXT_MUTED);
         }
 
-        int y = contentY + 56 - scrollOffset;
+        int y = rowsTop() - scrollOffset;
         for (int index = 0; index < elements.size(); index++) {
             int rowY = y + index * ROW_HEIGHT;
-            if (rowY + ROW_HEIGHT < contentY + 48 || rowY > contentY + contentHeight - 42) continue;
+            if (rowY + ROW_CARD_HEIGHT < viewportTop() || rowY > viewportBottom()) continue;
             boolean isDragged = draggedIndex == index;
             int alpha = isDragged ? 0x66FFFFFF : 0xFFFFFFFF;
             int tint = DeckTheme.TEXT & alpha;
-            DeckTheme.roundedRect(graphics, contentX, rowY, contentWidth, ROW_HEIGHT - 2, 5,
+            DeckTheme.roundedRect(graphics, innerX(), rowY, innerWidth(), ROW_CARD_HEIGHT, 5,
                     isDragged ? DeckTheme.ACCENT_MUTED : DeckTheme.FIELD);
             if (isDragged) {
-                graphics.fill(contentX + 2, rowY + ROW_HEIGHT / 2 - 1,
-                        contentX + contentWidth - 2, rowY + ROW_HEIGHT / 2, DeckTheme.ACCENT);
+                graphics.fill(innerX() + 2, rowY + ROW_CARD_HEIGHT / 2 - 1,
+                        innerX() + innerWidth() - 2, rowY + ROW_CARD_HEIGHT / 2, DeckTheme.ACCENT);
             }
             if (option.reorderingAllowed()) {
                 DeckIcons.draw(graphics, DeckIcons.Icon.GRIP_VERTICAL,
-                        contentX + 4, rowY + (ROW_HEIGHT - 22) / 2, 18, tint);
+                        innerX() + 3, rowY + (ROW_CARD_HEIGHT - 22) / 2, 18, tint);
             }
             if (option.deletionAllowed() && elements.size() > option.minimumSize()) {
-                int delX = contentX + contentWidth - DELETE_WIDTH - 4;
-                DeckIcons.draw(graphics, DeckIcons.Icon.CLOSE, delX + 6, rowY + (ROW_HEIGHT - 16) / 2,
+                int delX = innerX() + innerWidth() - DELETE_WIDTH;
+                DeckIcons.draw(graphics, DeckIcons.Icon.CLOSE, delX + 6, rowY + (ROW_CARD_HEIGHT - 16) / 2,
                         16, 0xFFFF6B6B);
             }
             if (dropIndex == index && draggedIndex >= 0) {
-                graphics.fill(contentX + HANDLE_WIDTH, rowY - 2,
-                        contentX + contentWidth - DELETE_WIDTH - GAP, rowY, DeckTheme.ACCENT);
+                graphics.fill(innerX() + HANDLE_WIDTH, rowY - 2,
+                        innerX() + innerWidth() - DELETE_WIDTH - GAP, rowY, DeckTheme.ACCENT);
             }
         }
         if (dropIndex == elements.size() && draggedIndex >= 0) {
             int lastY = y + elements.size() * ROW_HEIGHT;
-            graphics.fill(contentX + HANDLE_WIDTH, lastY - 2,
-                    contentX + contentWidth - DELETE_WIDTH - GAP, lastY, DeckTheme.ACCENT);
+            graphics.fill(innerX() + HANDLE_WIDTH, lastY - 2,
+                    innerX() + innerWidth() - DELETE_WIDTH - GAP, lastY, DeckTheme.ACCENT);
         }
         graphics.disableScissor();
 
@@ -362,19 +397,19 @@ public final class ListEditorPane {
         }
         // Click landed on empty pane area; clear focus so no stale field keeps keyboard input.
         focusWidget(null);
-        int y = contentY + 56 - scrollOffset;
+        int y = rowsTop() - scrollOffset;
         for (int index = 0; index < elements.size(); index++) {
             int rowY = y + index * ROW_HEIGHT;
-            if (rowY + ROW_HEIGHT < contentY + 48 || rowY > contentY + contentHeight - 42) continue;
-            int delX = contentX + contentWidth - DELETE_WIDTH - 4;
+            if (rowY + ROW_CARD_HEIGHT < viewportTop() || rowY > viewportBottom()) continue;
+            int delX = innerX() + innerWidth() - DELETE_WIDTH;
             if (mouseX >= delX && mouseX < delX + DELETE_WIDTH
-                    && mouseY >= rowY && mouseY < rowY + ROW_HEIGHT - 2) {
+                    && mouseY >= rowY && mouseY < rowY + ROW_CARD_HEIGHT) {
                 deleteEntry(index);
                 return true;
             }
             if (option.reorderingAllowed()
-                    && mouseX >= contentX && mouseX < contentX + HANDLE_WIDTH
-                    && mouseY >= rowY && mouseY < rowY + ROW_HEIGHT - 2) {
+                    && mouseX >= innerX() && mouseX < innerX() + HANDLE_WIDTH
+                    && mouseY >= rowY && mouseY < rowY + ROW_CARD_HEIGHT) {
                 draggedIndex = index;
                 dragMouseY = (int) mouseY;
                 dropIndex = index;
@@ -397,7 +432,7 @@ public final class ListEditorPane {
     public boolean mouseDragged(MouseButtonEvent event, double dragX, double dragY) {
         if (draggedIndex >= 0) {
             dragMouseY = (int) event.y();
-            int relativeY = dragMouseY - (contentY + 56) + scrollOffset;
+            int relativeY = dragMouseY - rowsTop() + scrollOffset;
             dropIndex = Math.max(0, Math.min(elements.size(), relativeY / ROW_HEIGHT));
             return true;
         }
@@ -420,10 +455,9 @@ public final class ListEditorPane {
     }
 
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
-        if (mouseX < contentX || mouseX > contentX + contentWidth
-                || mouseY < contentY + 48 || mouseY > contentY + contentHeight - 42) return false;
-        int totalHeight = elements.size() * ROW_HEIGHT + 100;
-        int maxScroll = Math.max(0, totalHeight - (contentHeight - 90));
+        if (mouseX < innerX() || mouseX > innerX() + innerWidth()
+                || mouseY < viewportTop() || mouseY > viewportBottom()) return false;
+        int maxScroll = Math.max(0, elements.size() * ROW_HEIGHT - viewportHeight());
         int next = Math.max(0, Math.min(maxScroll, scrollOffset - (int) Math.round(scrollY * 18)));
         if (next == scrollOffset) return false;
         scrollOffset = next;
@@ -440,4 +474,47 @@ public final class ListEditorPane {
         if (focusedWidget != null && focusedWidget.charTyped(event)) return true;
         return false;
     }
+
+    private void publishElements() {
+        List<Object> committed = new ArrayList<>(elements.size());
+        for (Object element : elements) {
+            if (element instanceof PendingElement pending) {
+                if (pending.fallbackValue() != null) committed.add(pending.fallbackValue());
+            } else {
+                committed.add(element);
+            }
+        }
+        if (committed.equals(option.draftValue())) return;
+        onChanged.accept(committed);
+        markDirty.run();
+    }
+
+    private void keepPendingText(int index, Object originalValue, String text) {
+        Object fallback = originalValue instanceof PendingElement pending
+                ? pending.fallbackValue() : originalValue;
+        elements.set(index, new PendingElement(text, fallback));
+    }
+
+    private void focusLastElementWidget() {
+        for (int index = widgets.size() - 1; index >= 0; index--) {
+            AbstractWidget widget = widgets.get(index);
+            if (widget != addButton && widget != backButton) {
+                focusWidget(widget);
+                return;
+            }
+        }
+    }
+
+    private int innerX() { return contentX + PANE_PADDING; }
+    private int innerWidth() { return Math.max(0, contentWidth - PANE_PADDING * 2); }
+    private int viewportTop() {
+        int descriptionLines = option.descriptionText().isEmpty() ? 0
+                : font.split(option.descriptionText().component(), innerWidth()).size();
+        return Math.max(contentY + 68,
+                contentY + 55 + descriptionLines * DESCRIPTION_LINE_HEIGHT);
+    }
+    private int footerY() { return contentY + contentHeight - PANE_PADDING - 28; }
+    private int viewportBottom() { return footerY() - GAP; }
+    private int viewportHeight() { return Math.max(0, viewportBottom() - viewportTop()); }
+    private int rowsTop() { return viewportTop() + GAP; }
 }
