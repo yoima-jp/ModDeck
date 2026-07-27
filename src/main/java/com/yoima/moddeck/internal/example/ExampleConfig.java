@@ -79,7 +79,7 @@ public final class ExampleConfig {
                         ? ValidationResult.success() : ValidationResult.invalid(key("validation.threshold")));
         ListOption<String> fixedOrder = new ListOption<>("fixed_order", key("option.fixed_order"),
                 key("option.fixed_order.desc"), List.of("first", "second"), STRING_CODEC, 2, 2)
-                .newElementFrom(() -> "item").allowInsertion(false).allowDeletion(false);
+                .newElementFrom(() -> "item").allowInsertion(false).allowDeletion(false).allowReordering(false);
 
         ColorOption accent = new ColorOption("accent", key("option.accent"), key("option.accent.desc"),
                 0x8B5CF6, false);

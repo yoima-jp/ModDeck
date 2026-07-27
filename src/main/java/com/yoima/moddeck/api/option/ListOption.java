@@ -17,6 +17,7 @@ public final class ListOption<T> extends ConfigOption<List<T>> {
     private ConfigValidator<T> elementValidator = ConfigValidator.acceptingAll();
     private boolean insertionAllowed = true;
     private boolean deletionAllowed = true;
+    private boolean reorderingAllowed = true;
 
     public ListOption(String id, ConfigText name, ConfigText description, List<T> defaultValue,
                       ValueCodec<T> elementCodec, int minimumSize, int maximumSize) {
@@ -45,6 +46,7 @@ public final class ListOption<T> extends ConfigOption<List<T>> {
     }
     public boolean insertionAllowed() { return insertionAllowed; }
     public boolean deletionAllowed() { return deletionAllowed; }
+    public boolean reorderingAllowed() { return reorderingAllowed; }
     public ListOption<T> newElementFrom(Supplier<T> supplier) {
         newElementSupplier = Objects.requireNonNull(supplier, "supplier");
         return this;
@@ -56,6 +58,7 @@ public final class ListOption<T> extends ConfigOption<List<T>> {
     }
     public ListOption<T> allowInsertion(boolean allowed) { insertionAllowed = allowed; return this; }
     public ListOption<T> allowDeletion(boolean allowed) { deletionAllowed = allowed; return this; }
+    public ListOption<T> allowReordering(boolean allowed) { reorderingAllowed = allowed; return this; }
 
     @Override public List<T> decode(Object value) {
         if (!(value instanceof List<?> values)) throw new IllegalArgumentException("Expected list for " + id());

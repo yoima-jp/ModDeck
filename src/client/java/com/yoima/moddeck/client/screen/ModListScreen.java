@@ -2,12 +2,14 @@ package com.yoima.moddeck.client.screen;
 
 import com.yoima.moddeck.api.*;
 import com.yoima.moddeck.api.option.ConfigOption;
+import com.yoima.moddeck.api.option.ListOption;
 import com.yoima.moddeck.api.option.DescriptionOption;
 import com.yoima.moddeck.api.option.SubcategoryOption;
 import com.yoima.moddeck.api.storage.ConfigStorage;
 import com.yoima.moddeck.client.theme.DeckFonts;
 import com.yoima.moddeck.client.theme.DeckIcons;
 import com.yoima.moddeck.client.theme.DeckTheme;
+import com.yoima.moddeck.client.screen.ListEditorPane;
 import com.yoima.moddeck.client.widget.*;
 import java.io.IOException;
 import java.util.*;
@@ -63,6 +65,9 @@ public final class ModListScreen extends Screen {
     private boolean pendingWidgetRebuild;
     private final Map<AbstractWidget, ConfigOption<?>> optionWidgets = new IdentityHashMap<>();
     private List<String> renderedOptionIds = List.of();
+    private ListOption<?> editingList;
+    private ConfigCategory editingListCategory;
+    private ListEditorPane listEditorPane;
 
     public ModListScreen(Screen parent) {
         this(parent, null);
@@ -134,43 +139,64 @@ public final class ModListScreen extends Screen {
             ConfigCategory category = selected.categories().get(Math.min(activeCategory, selected.categories().size() - 1));
             List<ConfigOption<?>> options = visibleOptions(category);
             renderedOptionIds = options.stream().map(ConfigOption::id).toList();
-            int availableHeight = Math.max(1, contentBottom - contentTop - 8);
-            optionRowHeight = Math.max(42, Math.min(58, availableHeight / Math.max(1, options.size())));
-            int widgetWidth = Math.max(150, Math.min(250, mainWidth * 42 / 100));
-            int widgetX = mainX + mainWidth - widgetWidth - 28;
-            int y = contentTop + 8 - scrollOffset;
-            for (int index = 0; index < options.size(); index++) {
-                ConfigOption<?> option = options.get(index);
-                // A small tolerance absorbs rounding introduced by the virtual-canvas scale so
-                // the final row remains visible instead of requiring a meaningless 4–6px scroll.
-                if (y >= contentTop && y + optionRowHeight <= contentBottom) {
-                    if (option instanceof DescriptionOption) {
-                        y += optionRowHeight;
-                        continue;
+            if (editingList != null) {
+                int paneX = mainX + 14;
+                int paneY = contentTop;
+                int paneWidth = mainWidth - 28;
+                int paneHeight = contentBottom - contentTop;
+                listEditorPane = new ListEditorPane(uiFont, editingList, editingListCategory,
+                        paneX, paneY, paneWidth, paneHeight,
+                        value -> {
+                            @SuppressWarnings("unchecked")
+                            List<Object> cast = (List<Object>) value;
+                            @SuppressWarnings({"rawtypes", "unchecked"})
+                            boolean success = ((ListOption) editingList).trySetDraftValue(cast);
+                            if (!success) {
+                                status = Component.translatable("moddeck.list.invalid_element");
+                                statusError = true;
+                            }
+                }, this::markDirty, this::stopListEditing);
+                listEditorPane.refresh();
+                renderedOptionIds = List.of(editingList.id());
+            } else {
+                int availableHeight = Math.max(1, contentBottom - contentTop - 8);
+                optionRowHeight = Math.max(42, Math.min(58, availableHeight / Math.max(1, options.size())));
+                int widgetWidth = Math.max(150, Math.min(250, mainWidth * 42 / 100));
+                int widgetX = mainX + mainWidth - widgetWidth - 28;
+                int y = contentTop + 8 - scrollOffset;
+                for (int index = 0; index < options.size(); index++) {
+                    ConfigOption<?> option = options.get(index);
+                    // A small tolerance absorbs rounding introduced by the virtual-canvas scale so
+                    // the final row remains visible instead of requiring a meaningless 4–6px scroll.
+                    if (y >= contentTop && y + optionRowHeight <= contentBottom) {
+                        if (option instanceof DescriptionOption) {
+                            y += optionRowHeight;
+                            continue;
+                        }
+                        // Rebuilding while Minecraft is iterating child listeners can invalidate that
+                        // iteration. Defer structural changes such as expanding a subcategory or
+                        // resetting an option to the next tick.
+                        Runnable changed = option instanceof SubcategoryOption ? this::requestWidgetRebuild : this::markDirty;
+                        AbstractWidget widget = OptionWidgetRegistry.create(uiFont, widgetX,
+                                y, widgetWidth, option,
+                                changed, false);
+                        widget.setY(y + Math.max(0, (optionRowHeight - widget.getHeight()) / 2));
+                        widget.active = option.editable() && option.isEnabled();
+                        if (widget instanceof ExpandableOptionWidget popup) {
+                            popup.setPopupViewport(contentTop + 3, contentBottom - 3);
+                        }
+                        addRenderableWidget(widget);
+                        optionWidgets.put(widget, option);
+                        if (!(option instanceof SubcategoryOption)) {
+                            OptionResetWidget reset = new OptionResetWidget(widgetX - 26,
+                                    y + Math.max(0, (optionRowHeight - 22) / 2), option,
+                                    this::requestWidgetRebuildAndMarkDirty);
+                            reset.refreshState();
+                            addRenderableWidget(reset);
+                        }
                     }
-                    // Rebuilding while Minecraft is iterating child listeners can invalidate that
-                    // iteration. Defer structural changes such as expanding a subcategory or
-                    // resetting an option to the next tick.
-                    Runnable changed = option instanceof SubcategoryOption ? this::requestWidgetRebuild : this::markDirty;
-                    AbstractWidget widget = OptionWidgetRegistry.create(uiFont, widgetX,
-                            y, widgetWidth, option,
-                            changed, false);
-                    widget.setY(y + Math.max(0, (optionRowHeight - widget.getHeight()) / 2));
-                    widget.active = option.editable() && option.isEnabled();
-                    if (widget instanceof ExpandableOptionWidget popup) {
-                        popup.setPopupViewport(contentTop + 3, contentBottom - 3);
-                    }
-                    addRenderableWidget(widget);
-                    optionWidgets.put(widget, option);
-                    if (!(option instanceof SubcategoryOption)) {
-                        OptionResetWidget reset = new OptionResetWidget(widgetX - 26,
-                                y + Math.max(0, (optionRowHeight - 22) / 2), option,
-                                this::requestWidgetRebuildAndMarkDirty);
-                        reset.refreshState();
-                        addRenderableWidget(reset);
-                    }
+                    y += optionRowHeight;
                 }
-                y += optionRowHeight;
             }
 
             int buttonY = mainBottom - 35;
@@ -215,6 +241,9 @@ public final class ModListScreen extends Screen {
         graphics.pose().scale(uiScale, uiScale);
         extractBackground(graphics, virtualMouseX, virtualMouseY, delta);
         drawStaticContent(graphics, virtualMouseX, virtualMouseY);
+        if (listEditorPane != null) {
+            listEditorPane.render(graphics, virtualMouseX, virtualMouseY, delta);
+        }
         for (var child : children()) {
             if (child instanceof Renderable renderable) {
                 renderable.extractRenderState(graphics, virtualMouseX, virtualMouseY, delta);
@@ -233,6 +262,9 @@ public final class ModListScreen extends Screen {
 
     @Override public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
         MouseButtonEvent transformed = transform(event);
+        if (listEditorPane != null) {
+            if (listEditorPane.mouseClicked(transformed, doubleClick)) return true;
+        }
         for (var child : children()) {
             if (child instanceof KeybindWidget keybind && keybind.isListening()) {
                 return keybind.captureMouse(transformed);
@@ -287,6 +319,7 @@ public final class ModListScreen extends Screen {
                 int categoryIndex = firstVisibleCategory + visibleIndex;
                 if (categoryIndex >= selected.categories().size()) break;
                 if (mouseX >= tabX + visibleIndex * tabWidth && mouseX < tabX + (visibleIndex + 1) * tabWidth) {
+                    stopListEditing();
                     activeCategory = categoryIndex;
                     scrollOffset = 0;
                     status = Component.empty();
@@ -302,6 +335,7 @@ public final class ModListScreen extends Screen {
     @Override public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
         mouseX /= uiScale;
         mouseY /= uiScale;
+        if (listEditorPane != null && listEditorPane.mouseScrolled(mouseX, mouseY, scrollX, scrollY)) return true;
         if (selected != null && selected.categories().size() > 1 && mouseX >= mainX
                 && mouseY >= mainTop + 68 && mouseY < mainTop + 101) {
             int maximum = Math.max(0, selected.categories().size() - visibleTabCount());
@@ -340,7 +374,13 @@ public final class ModListScreen extends Screen {
                 Component.translatable("moddeck.discard.cancel")));
     }
 
+    @Override public boolean charTyped(net.minecraft.client.input.CharacterEvent event) {
+        if (listEditorPane != null && listEditorPane.charTyped(event)) return true;
+        return super.charTyped(event);
+    }
+
     @Override public boolean keyPressed(KeyEvent event) {
+        if (listEditorPane != null && listEditorPane.keyPressed(event)) return true;
         for (var child : children()) {
             if (child instanceof KeybindWidget keybind && keybind.isListening()) {
                 return keybind.captureKey(event);
@@ -351,6 +391,9 @@ public final class ModListScreen extends Screen {
 
     @Override public void tick() {
         super.tick();
+        // List editing owns its own widget lifecycle; Screen's id-comparison rebuild would
+        // recreate the pane and all row widgets every tick, destroying drag state and field focus.
+        if (editingList != null) return;
         optionWidgets.forEach((widget, option) -> widget.active = option.editable() && option.isEnabled());
         children().stream().filter(OptionResetWidget.class::isInstance)
                 .map(OptionResetWidget.class::cast).forEach(OptionResetWidget::refreshState);
@@ -362,14 +405,17 @@ public final class ModListScreen extends Screen {
     }
 
     @Override public boolean mouseReleased(MouseButtonEvent event) {
+        MouseButtonEvent transformed = transform(event);
         for (var child : children()) if (child instanceof ExpandableOptionWidget popup) {
             popup.handleExpandedRelease();
         }
-        return super.mouseReleased(transform(event));
+        if (listEditorPane != null && listEditorPane.mouseReleased(transformed)) return true;
+        return super.mouseReleased(transformed);
     }
 
     @Override public boolean mouseDragged(MouseButtonEvent event, double dragX, double dragY) {
         MouseButtonEvent transformed = transform(event);
+        if (listEditorPane != null && listEditorPane.mouseDragged(transformed, dragX / uiScale, dragY / uiScale)) return true;
         for (var child : children()) {
             if (child instanceof ExpandableOptionWidget popup
                     && popup.handleExpandedDrag(transformed.x(), transformed.y())) return true;
@@ -470,6 +516,7 @@ public final class ModListScreen extends Screen {
 
     private void drawOptionLabels(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
         hoveredOption = null;
+        if (editingList != null) return;
         ConfigCategory category = selected.categories().get(activeCategory);
         List<ConfigOption<?>> options = visibleOptions(category);
         if (options.isEmpty()) {
@@ -564,6 +611,7 @@ public final class ModListScreen extends Screen {
 
     private void reset() {
         selected.reset();
+        stopListEditing();
         status = Component.translatable("moddeck.reset_ready");
         statusError = false;
         requestWidgetRebuild();
@@ -668,6 +716,21 @@ public final class ModListScreen extends Screen {
 
     private int visibleTabCount() {
         return Math.min(selected.categories().size(), Math.max(1, (mainWidth - 40) / 90));
+    }
+
+    public void startListEditing(ListOption<?> option) {
+        this.editingList = option;
+        this.editingListCategory = selected != null ? selected.categories().get(activeCategory) : null;
+        this.scrollOffset = 0;
+        this.optionQuery = "";
+        rebuildWidgets();
+    }
+
+    public void stopListEditing() {
+        this.editingList = null;
+        this.editingListCategory = null;
+        this.listEditorPane = null;
+        rebuildWidgets();
     }
 
     private int actionButtonWidth(Component text) {

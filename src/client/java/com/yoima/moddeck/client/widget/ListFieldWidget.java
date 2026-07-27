@@ -1,7 +1,8 @@
 package com.yoima.moddeck.client.widget;
 
 import com.yoima.moddeck.api.option.ListOption;
-import com.yoima.moddeck.client.screen.ListEditorScreen;
+import com.yoima.moddeck.client.screen.ModListScreen;
+import net.minecraft.client.gui.screens.Screen;
 import com.yoima.moddeck.client.theme.DeckFonts;
 import com.yoima.moddeck.client.theme.DeckTheme;
 import net.minecraft.client.Minecraft;
@@ -25,8 +26,10 @@ public final class ListFieldWidget<T> extends AbstractWidget {
     }
 
     @Override public void onClick(MouseButtonEvent event, boolean doubleClick) {
-        Minecraft minecraft = Minecraft.getInstance();
-        minecraft.setScreenAndShow(new ListEditorScreen<>(minecraft.gui.screen(), option, onChanged));
+        Screen screen = Minecraft.getInstance().gui.screen();
+        if (screen instanceof ModListScreen modList) {
+            modList.startListEditing(option);
+        }
     }
 
     @Override protected void extractWidgetRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {

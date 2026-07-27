@@ -43,5 +43,10 @@
   "moddeck.keybind.unbound": "未割り当て",
   "moddeck.validation.fix_errors": "無効な値を修正してください",
   "moddeck.confirm_save.title": "設定を保存しますか？",
-  "moddeck.confirm_save.message": "設定の変更を適用しますか？"
+  "moddeck.confirm_save.message": "設定の変更を適用しますか？",
+  "moddeck.list.back_to": "%s",
+  "moddeck.list.add_entry": "項目を追加",
+  "moddeck.list.empty": "項目がありません",
+  "moddeck.list.drag_to_reorder": "ドラッグして並び替え",
+  "moddeck.list.delete": "削除"
 }

@@ -43,5 +43,10 @@
   "moddeck.keybind.unbound": "Unbound",
   "moddeck.validation.fix_errors": "Fix invalid values before saving",
   "moddeck.confirm_save.title": "Save settings?",
-  "moddeck.confirm_save.message": "Apply these configuration changes?"
+  "moddeck.confirm_save.message": "Apply these configuration changes?",
+  "moddeck.list.back_to": "%s",
+  "moddeck.list.add_entry": "Add entry",
+  "moddeck.list.empty": "No entries",
+  "moddeck.list.drag_to_reorder": "Drag to reorder",
+  "moddeck.list.delete": "Delete"
 }

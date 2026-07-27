@@ -11,7 +11,7 @@ import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 
 public final class DeckButton extends AbstractWidget {
-    public enum Style { PRIMARY, SECONDARY, ICON, THEME }
+    public enum Style { PRIMARY, SECONDARY, BACK, ICON, THEME }
 
     private final Runnable action;
     private final Style style;
@@ -30,6 +30,7 @@ public final class DeckButton extends AbstractWidget {
         int fill = switch (style) {
             case PRIMARY -> isHoveredOrFocused() ? 0xFF967CF0 : DeckTheme.ACCENT_DARK;
             case SECONDARY -> isHoveredOrFocused() ? DeckTheme.FIELD_HOVER : DeckTheme.PANEL_RAISED;
+            case BACK -> isHoveredOrFocused() ? DeckTheme.FIELD_HOVER : DeckTheme.PANEL_RAISED;
             case ICON -> isHoveredOrFocused() ? DeckTheme.FIELD_HOVER : DeckTheme.FIELD;
             case THEME -> isHoveredOrFocused() ? DeckTheme.PANEL_RAISED : DeckTheme.BACKGROUND_TOP;
         };
@@ -39,8 +40,9 @@ public final class DeckButton extends AbstractWidget {
             DeckTheme.roundedRect(graphics, getX(), getY(), getWidth(), getHeight(), 5, fill);
         }
         var font = DeckFonts.ui();
-        if (style == Style.PRIMARY || style == Style.SECONDARY) {
-            DeckIcons.Icon icon = style == Style.PRIMARY ? DeckIcons.Icon.SAVE : DeckIcons.Icon.RESET;
+        if (style == Style.PRIMARY || style == Style.SECONDARY || style == Style.BACK) {
+            DeckIcons.Icon icon = style == Style.PRIMARY ? DeckIcons.Icon.SAVE
+                    : style == Style.BACK ? DeckIcons.Icon.CHEVRON_LEFT : DeckIcons.Icon.RESET;
             DeckIcons.draw(graphics, icon, getX() + 10, getY() + 6, 16, DeckTheme.TEXT);
             DeckTheme.centeredText(graphics, font, getMessage(), getX() + getWidth() / 2 + 5,
                     getY() + (getHeight() - 8) / 2, DeckTheme.TEXT);
