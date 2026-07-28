@@ -174,6 +174,10 @@ and included in the built jar under `META-INF/licenses/`.
 .\gradlew.bat runClient --no-daemon
 ```
 
+## API Documentation
+
+Full API documentation for mod developers and AI coding agents is available in [api/README.md](api/README.md).
+
 Public API lives under `com.yoima.moddeck.api`. Minecraft client classes are isolated in the
 `src/client` source set so the common entrypoint remains dedicated-server safe.
 
