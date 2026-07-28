@@ -1,6 +1,7 @@
 package com.yoima.moddeck.internal.example;
 
 import com.yoima.moddeck.api.ConfigDefinition;
+import com.yoima.moddeck.api.ConfigPreset;
 import com.yoima.moddeck.api.ConfigRequirement;
 import com.yoima.moddeck.api.ConfigScreenApi;
 import com.yoima.moddeck.api.ConfigText;
@@ -125,6 +126,18 @@ public final class ExampleConfig {
         ButtonOption verifyButton = new ButtonOption("verify_button", key("option.verify_button"),
                 key("option.verify_button.desc"), key("option.verify_button.label"),
                 () -> LOGGER.info("Example Mod button action completed"));
+        ConfigPreset performancePreset = ConfigPreset.builderKey(
+                        "performance", "example_mod.preset.performance")
+                .set("numbers", "cache_limit", 2048L)
+                .set("choices", "display_mode", DisplayMode.COMPACT)
+                .set("choices", "quality", "fast")
+                .build();
+        ConfigPreset qualityPreset = ConfigPreset.builderKey(
+                        "quality", "example_mod.preset.quality")
+                .set("numbers", "cache_limit", 8192L)
+                .set("choices", "display_mode", DisplayMode.DETAILED)
+                .set("choices", "quality", "quality")
+                .build();
 
         ConfigScreenApi.register(ConfigDefinition.builder("example_mod")
                 .titleKey("example_mod.config.title")
@@ -150,6 +163,8 @@ public final class ExampleConfig {
                 .categoryKey("advanced", "example_mod.category.advanced")
                 .descriptionEntry("advanced_hint", key("description.advanced"))
                 .addOption(advanced)
+                .preset(performancePreset)
+                .preset(qualityPreset)
                 .build());
     }
 

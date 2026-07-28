@@ -85,6 +85,10 @@ public final class ListOption<T> extends ConfigOption<List<T>> {
     @Override public Object encode() { return value().stream().map(elementCodec::encode).toList(); }
     @Override public Object encodeDraft() { return draftValue().stream().map(elementCodec::encode).toList(); }
 
+    @Override protected boolean isCompatibleValueType(Object candidate) {
+        return candidate instanceof List<?>;
+    }
+
     @Override protected List<T> validate(List<T> value) {
         List<T> copy = List.copyOf(value);
         if (copy.size() < minimumSize || copy.size() > maximumSize) {

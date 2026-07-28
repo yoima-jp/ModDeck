@@ -82,6 +82,31 @@ advanced.displayedWhen(ConfigRequirement.isTrue(enabled));
 count.enabledWhen(ConfigRequirement.isValue(mode, Mode.DETAILED));
 ```
 
+Mods can also register named presets that apply several typed draft values without saving them.
+Targets use both category and option IDs, so repeated option names in different categories remain
+unambiguous:
+
+```java
+ConfigPreset performance = ConfigPreset.builderKey(
+        "performance", "example_mod.preset.performance")
+    .set("video", "particles", ParticleMode.MINIMAL)
+    .set("video", "render_distance", 8)
+    .build();
+
+ConfigDefinition definition = ConfigDefinition.builder("example_mod")
+    .category("video", "Video")
+    .enumOption("particles", "Particles", ParticleMode.ALL, ParticleMode.class)
+    .integerOption("render_distance", "Render distance", 16, 2, 32)
+    .preset(performance)
+    .build();
+
+definition.applyPreset("performance"); // Draft only; save remains explicit.
+```
+
+Unknown targets, duplicate preset IDs, non-persistent entries, incompatible types, and invalid
+values are rejected with an exception. Registered metadata is available through `presets()` and
+`preset(id)` for custom preset pickers or other integrations.
+
 For annotation-driven registration, annotate a POJO with `@ModDeckAutoConfig`, mark fields with
 `@AutoEntry`, and add `@AutoRange`, `@AutoColor`, or `@AutoKeybind` where appropriate. Then call
 `AutoConfig.register(config)`. The returned `AutoConfigHolder` exposes the generated definition and
@@ -132,6 +157,7 @@ The hub uses a responsive virtual canvas so Minecraft's automatic GUI scale does
 desktop-style layout. Its native 26.2 GUI rendering includes:
 
 - installed-Mod search in the sidebar and a separate current-Mod settings search
+- highlighted search matches and a preset picker when the selected Mod registers presets
 - fully mod-defined category tabs, nested subcategories, and a fixed action footer
 - automatic, light, and dark themes with purple selection and focus accents
 - dedicated switch, numeric slider/field, text/list/color/keybind controls, and selectors

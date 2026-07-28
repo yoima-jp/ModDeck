@@ -51,4 +51,8 @@ public final class EnumOption<E extends Enum<E>> extends ConfigOption<E> {
 
     @Override public Object encode() { return value().name(); }
     @Override public Object encodeDraft() { return draftValue().name(); }
+
+    @Override protected boolean isCompatibleValueType(Object candidate) {
+        return enumType.isInstance(candidate);
+    }
 }

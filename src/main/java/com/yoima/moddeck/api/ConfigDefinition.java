@@ -16,9 +16,11 @@ public final class ConfigDefinition {
     private final List<ConfigCategory> categories;
     private final ConfigScreenStyle style;
     private final Runnable saveCallback;
+    private final List<ConfigPreset> presets;
 
     private ConfigDefinition(String modId, ConfigRoute route, ConfigText title, ConfigText description,
-                             List<ConfigCategory> categories, ConfigScreenStyle style, Runnable saveCallback) {
+                             List<ConfigCategory> categories, ConfigScreenStyle style, Runnable saveCallback,
+                             List<ConfigPreset> presets) {
         this.modId = modId;
         this.route = route;
         this.title = title;
@@ -26,6 +28,7 @@ public final class ConfigDefinition {
         this.categories = List.copyOf(categories);
         this.style = style;
         this.saveCallback = saveCallback;
+        this.presets = List.copyOf(presets);
     }
 
     public static Builder builder(String modId) { return new Builder(modId); }
@@ -59,6 +62,91 @@ public final class ConfigDefinition {
         categories.forEach(category -> category.options().forEach(ConfigOption::discardChanges));
     }
 
+    public List<ConfigPreset> presets() { return presets; }
+
+    public Optional<ConfigPreset> preset(String id) {
+        return presets.stream().filter(preset -> preset.id().equals(id)).findFirst();
+    }
+
+    /**
+     * Applies a registered preset by updating draft values for each entry. Validation, change
+     * callbacks, and dirty state are exercised through {@code ConfigOption.setDraftValue}. The
+     * caller is responsible for saving — presets never persist. Throws if the preset id is
+     * unknown, a target option does not exist, a target is non-persistent, or a value is invalid.
+     */
+    public void applyPreset(String presetId) {
+        ConfigPreset preset = preset(presetId)
+                .orElseThrow(() -> new IllegalArgumentException("Unknown preset id: " + presetId));
+        List<PresetAssignment> assignments = new ArrayList<>(preset.entries().size());
+        for (ConfigPreset.Entry entry : preset.entries()) {
+            ConfigOption<?> option = option(entry.categoryId(), entry.optionId())
+                    .orElseThrow(() -> new IllegalArgumentException(
+                            "Unknown option " + entry.categoryId() + ":" + entry.optionId()
+                                    + " referenced by preset " + presetId));
+            if (!option.persistent()) {
+                throw new IllegalArgumentException(
+                        "Preset " + presetId + " targets non-persistent option "
+                                + entry.categoryId() + ":" + entry.optionId());
+            }
+            validatePresetValue(option, entry.value(), presetId);
+            assignments.add(new PresetAssignment(option, entry.value()));
+        }
+        // Validate the complete batch before invoking any change callbacks. A malformed preset
+        // therefore cannot leave earlier entries applied and later entries rejected.
+        assignments.forEach(assignment ->
+                setDraftOnOption(assignment.option(), assignment.value(), presetId));
+    }
+
+    private record PresetAssignment(ConfigOption<?> option, Object value) {}
+
+    // The heterogeneous option collection forces a per-option unchecked cast. Keeping it here
+    // localizes the type-unsafe boundary. The option owns its compatibility rule because comparing
+    // value.getClass() here would incorrectly reject valid List implementations and selector
+    // values declared through an interface or superclass.
+    private static <T> void setDraftOnOption(ConfigOption<T> option, Object value, String presetId) {
+        if (!option.isCompatibleValue(value)) {
+            throw new IllegalArgumentException(
+                    "Preset " + presetId + " supplied incompatible value type for option "
+                            + option.id() + ": " + value.getClass().getName());
+        }
+        try {
+            @SuppressWarnings("unchecked")
+            T typedValue = (T) value;
+            option.setDraftValue(typedValue);
+        } catch (ClassCastException exception) {
+            throw new IllegalArgumentException(
+                    "Preset " + presetId + " supplied incompatible value type for option "
+                            + option.id() + ": " + value.getClass().getName(),
+                    exception);
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalArgumentException(
+                    "Preset " + presetId + " supplied invalid value for option " + option.id()
+                            + ": " + exception.getMessage(),
+                    exception);
+        }
+    }
+
+    private static <T> void validatePresetValue(ConfigOption<T> option, Object value, String presetId) {
+        if (!option.isCompatibleValue(value)) {
+            throw new IllegalArgumentException(
+                    "Preset " + presetId + " supplied incompatible value type for option "
+                            + option.id() + ": " + value.getClass().getName());
+        }
+        try {
+            @SuppressWarnings("unchecked")
+            T typedValue = (T) value;
+            option.validateCandidate(typedValue);
+        } catch (ClassCastException exception) {
+            throw new IllegalArgumentException(
+                    "Preset " + presetId + " supplied incompatible value type for option "
+                            + option.id() + ": " + value.getClass().getName(), exception);
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalArgumentException(
+                    "Preset " + presetId + " supplied invalid value for option " + option.id()
+                            + ": " + exception.getMessage(), exception);
+        }
+    }
+
     private static List<ConfigOption<?>> flatten(List<ConfigOption<?>> options) {
         List<ConfigOption<?>> flattened = new ArrayList<>();
         for (ConfigOption<?> option : options) {
@@ -89,6 +177,7 @@ public final class ConfigDefinition {
         private Runnable saveCallback = () -> {};
         private boolean editable = true;
         private int nextCategoryOrder;
+        private final LinkedHashMap<String, ConfigPreset> presets = new LinkedHashMap<>();
 
         private Builder(String modId) {
             if (modId == null || !modId.matches("[a-z0-9_.-]+")) {
@@ -117,6 +206,14 @@ public final class ConfigDefinition {
             return this;
         }
         public Builder editable(boolean editable) { this.editable = editable; return this; }
+
+        public Builder preset(ConfigPreset preset) {
+            Objects.requireNonNull(preset, "preset");
+            if (presets.putIfAbsent(preset.id(), preset) != null) {
+                throw new IllegalArgumentException("Duplicate preset id: " + preset.id());
+            }
+            return this;
+        }
 
         public Builder category(String id, String displayName) {
             return category(id, ConfigText.literal(displayName), nextCategoryOrder++);
@@ -245,13 +342,63 @@ public final class ConfigDefinition {
                     .sorted(Comparator.comparingInt(category -> category.order))
                     .map(CategoryBuilder::build).toList();
             if (!editable) built.forEach(category -> setEditable(category.options(), false));
-            return new ConfigDefinition(modId, route, title, description, built, style, saveCallback);
+            validatePresets(built);
+            return new ConfigDefinition(modId, route, title, description, built, style, saveCallback,
+                    List.copyOf(presets.values()));
         }
 
         private static void setEditable(List<ConfigOption<?>> options, boolean editable) {
             for (ConfigOption<?> option : options) {
                 option.editable(editable);
                 if (option instanceof SubcategoryOption subcategory) setEditable(subcategory.children(), editable);
+            }
+        }
+
+        // Fail fast at build time so a broken preset never reaches a config screen: unknown
+        // categories/options and non-persistent targets are rejected
+        // here. Value-type and range compatibility are validated at apply time through
+        // setDraftValue, because preset values are typed Java objects (what setDraftValue
+        // accepts) rather than the encoded form that decode expects — the two differ for
+        // enum and selector options.
+        private void validatePresets(List<ConfigCategory> built) {
+            Map<String, Map<String, ConfigOption<?>>> categoryIndex = new HashMap<>();
+            for (ConfigCategory category : built) {
+                LinkedHashMap<String, ConfigOption<?>> flat = new LinkedHashMap<>();
+                for (ConfigOption<?> option : category.options()) {
+                    indexOption(category.id(), flat, option);
+                }
+                categoryIndex.put(category.id(), flat);
+            }
+            for (ConfigPreset preset : presets.values()) {
+                for (ConfigPreset.Entry entry : preset.entries()) {
+                    Map<String, ConfigOption<?>> optionIndex = categoryIndex.get(entry.categoryId());
+                    if (optionIndex == null) {
+                        throw new IllegalArgumentException(
+                                "Preset " + preset.id() + " references unknown category: " + entry.categoryId());
+                    }
+                    ConfigOption<?> option = optionIndex.get(entry.optionId());
+                    if (option == null) {
+                        throw new IllegalArgumentException(
+                                "Preset " + preset.id() + " references unknown option: "
+                                        + entry.categoryId() + ":" + entry.optionId());
+                    }
+                    if (!option.persistent()) {
+                        throw new IllegalArgumentException(
+                                "Preset " + preset.id() + " targets non-persistent option: "
+                                        + entry.categoryId() + ":" + entry.optionId());
+                    }
+                }
+            }
+        }
+
+        private static void indexOption(String categoryId, LinkedHashMap<String, ConfigOption<?>> flat,
+                                        ConfigOption<?> option) {
+            if (flat.putIfAbsent(option.id(), option) != null) {
+                throw new IllegalArgumentException(
+                        "Duplicate option id in category " + categoryId + ": " + option.id());
+            }
+            if (option instanceof SubcategoryOption subcategory) {
+                for (ConfigOption<?> child : subcategory.children()) indexOption(categoryId, flat, child);
             }
         }
 

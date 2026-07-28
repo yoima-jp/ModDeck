@@ -26,6 +26,7 @@ import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.locale.Language;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.util.FormattedCharSequence;
 
 /** Integrated hub matching the desktop-like Mod Deck reference while remaining a native Screen. */
@@ -57,6 +58,7 @@ public final class ModListScreen extends Screen {
     private int contentTop;
     private int contentBottom;
     private int categoryTabsTop;
+    private int footerActionsLeft;
     private Component status = Component.empty();
     private DeckButton saveButton;
     private SearchFieldWidget modSearchField;
@@ -121,6 +123,7 @@ public final class ModListScreen extends Screen {
         mainWidth = uiWidth - mainX - MARGIN;
         mainTop = 35;
         mainBottom = uiHeight - 10;
+        footerActionsLeft = mainX + mainWidth;
         int descriptionBottom = mainTop + 51 + modDescriptionLines().size() * DESCRIPTION_LINE_HEIGHT;
         categoryTabsTop = Math.max(mainTop + 68, descriptionBottom + 6);
         contentTop = selected != null && selected.categories().size() > 1
@@ -245,8 +248,19 @@ public final class ModListScreen extends Screen {
             int saveX = mainX + mainWidth - saveWidth - 16;
             saveButton = addRenderableWidget(new DeckButton(saveX, buttonY,
                     saveWidth, 27, saveText, DeckButton.Style.PRIMARY, this::requestSave));
-            addRenderableWidget(new DeckButton(saveX - resetWidth - 8, buttonY,
+            int resetX = saveX - resetWidth - 8;
+            addRenderableWidget(new DeckButton(resetX, buttonY,
                     resetWidth, 27, resetText, DeckButton.Style.SECONDARY, this::reset));
+            footerActionsLeft = resetX;
+            if (!selected.presets().isEmpty()) {
+                int presetWidth = Math.max(110, Math.min(150, mainWidth / 4));
+                int presetX = resetX - presetWidth - 8;
+                PresetSelectorWidget presetSelector = new PresetSelectorWidget(
+                        presetX, buttonY, presetWidth, selected.presets(), this::applyPreset);
+                presetSelector.setPopupViewport(contentTop + 3, mainBottom - 3);
+                addRenderableWidget(presetSelector);
+                footerActionsLeft = presetX;
+            }
         }
         // Keep the search field at its original position, but append the theme selector after it
         // so the selector and its popup are rendered above the overlapping header search area.
@@ -261,6 +275,15 @@ public final class ModListScreen extends Screen {
         DeckTheme.roundedRect(graphics, MARGIN, 91, sidebarWidth, Math.max(40, uiHeight - 101), 7, DeckTheme.PANEL);
         if (mainWidth > 0) DeckTheme.roundedRect(graphics, mainX, mainTop, mainWidth, mainBottom - mainTop, 8, DeckTheme.PANEL);
         if (selected != null) {
+            if (selected.categories().size() > 1) {
+                // Category navigation belongs to the fixed screen chrome, not the scrolling option
+                // list. Giving it its own surface makes that boundary visible and ensures labels,
+                // arrows, and hit targets stay anchored while the content beneath them scrolls.
+                DeckTheme.roundedRect(graphics, mainX + 14, categoryTabsTop - 2,
+                        mainWidth - 28, 34, 5, DeckTheme.PANEL_RAISED);
+                graphics.fill(mainX + 20, categoryTabsTop + 31,
+                        mainX + mainWidth - 20, categoryTabsTop + 32, DeckTheme.DIVIDER);
+            }
             DeckTheme.roundedRect(graphics, mainX + 14, contentTop, mainWidth - 28,
                     Math.max(20, contentBottom - contentTop), 7, DeckTheme.CARD);
             graphics.fill(mainX + 14, contentTop - 7, mainX + mainWidth - 14, contentTop - 6, DeckTheme.DIVIDER);
@@ -498,7 +521,9 @@ public final class ModListScreen extends Screen {
         if (!displayedStatus.getString().isEmpty()) {
             int statusColor = statusError ? 0xFFFF9E9E
                     : selected.isDirty() ? 0xFFFFCC66 : DeckTheme.SUCCESS;
-            graphics.text(uiFont, displayedStatus, mainX + 18, mainBottom - 26, statusColor, false);
+            graphics.text(uiFont, fit(displayedStatus,
+                            Math.max(40, footerActionsLeft - mainX - 28)),
+                    mainX + 18, mainBottom - 26, statusColor, false);
         }
     }
 
@@ -519,8 +544,10 @@ public final class ModListScreen extends Screen {
         for (ConfigDefinition definition : filteredDefinitions()) {
             if (y + 42 > bottom) break;
             DeckTheme.modCube(graphics, MARGIN + 11, y + 7, 28);
-            graphics.text(uiFont, definition.titleText().component(), MARGIN + 48, y + 10, DeckTheme.TEXT, false);
-            graphics.text(uiFont, definition.modId(), MARGIN + 48, y + 25, DeckTheme.TEXT_SECONDARY, false);
+            graphics.text(uiFont, highlightedText(definition.titleText().component().getString(), modQuery),
+                    MARGIN + 48, y + 10, DeckTheme.TEXT, false);
+            graphics.text(uiFont, highlightedText(definition.modId(), modQuery),
+                    MARGIN + 48, y + 25, DeckTheme.TEXT_SECONDARY, false);
             if (definition == selected) DeckIcons.draw(graphics, DeckIcons.Icon.CHEVRON_RIGHT,
                     MARGIN + sidebarWidth - 24, y + 12, 16, DeckTheme.TEXT);
             y += 44;
@@ -545,8 +572,10 @@ public final class ModListScreen extends Screen {
             String fitted = (tabLayout.overflow() && effectiveWidth < naturalWidth)
                     ? fit(label, effectiveWidth - CATEGORY_TAB_HORIZONTAL_PADDING)
                     : label.getString();
-            DeckTheme.centeredText(graphics, uiFont, fitted,
-                    tabX + effectiveWidth / 2, tabY + 4, color);
+            Component highlightedLabel = highlightedText(fitted, optionQuery);
+            graphics.text(uiFont, highlightedLabel,
+                    tabX + effectiveWidth / 2 - uiFont.width(highlightedLabel) / 2,
+                    tabY + 4, color, false);
             if (categoryIndex == activeCategory) {
                 graphics.fill(tabX, categoryTabsTop + 26, tabX + effectiveWidth - 8,
                         categoryTabsTop + 28, DeckTheme.ACCENT);
@@ -571,7 +600,8 @@ public final class ModListScreen extends Screen {
             int rowHeight = renderedRowHeights.get(index);
             if (y + rowHeight > contentTop && y < contentBottom) {
                 if (option instanceof DescriptionOption) {
-                    List<FormattedCharSequence> lines = uiFont.split(option.displayNameText().component(),
+                    List<FormattedCharSequence> lines = uiFont.split(
+                            highlightedText(option.displayNameText().component().getString(), optionQuery),
                             Math.max(90, mainWidth - 60));
                     int textHeight = lines.size() * DESCRIPTION_LINE_HEIGHT;
                     int textY = y + Math.max(0, (rowHeight - textHeight) / 2);
@@ -581,10 +611,11 @@ public final class ModListScreen extends Screen {
                     }
                 } else {
                 int labelColor = option.isEnabled() ? DeckTheme.TEXT : DeckTheme.TEXT_MUTED;
-                graphics.text(uiFont, option.displayNameText().component(), mainX + 30, y + 13, labelColor, false);
+                Component optionLabel = highlightedText(option.displayNameText().component().getString(), optionQuery);
+                graphics.text(uiFont, optionLabel, mainX + 30, y + 13, labelColor, false);
                 if (option.isRestartRequired()) {
                     graphics.text(uiFont, Component.translatable("moddeck.requires_restart"),
-                            mainX + 36 + uiFont.width(option.displayNameText().component()), y + 13,
+                            mainX + 36 + uiFont.width(optionLabel), y + 13,
                             DeckTheme.TEXT_MUTED, false);
                 }
                 int descY = y + 28;
@@ -595,7 +626,8 @@ public final class ModListScreen extends Screen {
                         descY += DESCRIPTION_LINE_HEIGHT;
                     }
                 } else if (!option.descriptionText().isEmpty()) {
-                    for (FormattedCharSequence line : uiFont.split(option.descriptionText().component(),
+                    for (FormattedCharSequence line : uiFont.split(
+                            highlightedText(option.descriptionText().component().getString(), optionQuery),
                             Math.max(90, mainWidth / 2 - 45))) {
                         graphics.text(uiFont, line, mainX + 30, descY, DeckTheme.TEXT_SECONDARY, false);
                         descY += DESCRIPTION_LINE_HEIGHT;
@@ -669,6 +701,20 @@ public final class ModListScreen extends Screen {
         requestWidgetRebuild();
     }
 
+    private void applyPreset(ConfigPreset preset) {
+        try {
+            selected.applyPreset(preset.id());
+            status = Component.translatable("moddeck.preset.applied", preset.displayText().component());
+            statusError = false;
+            requestWidgetRebuild();
+        } catch (IllegalArgumentException exception) {
+            status = Component.translatable("moddeck.preset.failed");
+            statusError = true;
+            LOGGER.log(Level.WARNING,
+                    "Could not apply preset " + preset.id() + " for " + selected.modId(), exception);
+        }
+    }
+
     private void save() {
         Optional<ConfigStorage> storage = ConfigScreenApi.storage();
         if (storage.isEmpty()) {
@@ -707,6 +753,29 @@ public final class ModListScreen extends Screen {
         String text = component.getString();
         if (uiFont.width(text) <= maximumWidth) return text;
         return uiFont.plainSubstrByWidth(text, Math.max(0, maximumWidth - uiFont.width("…"))) + "…";
+    }
+
+    /**
+     * Highlights every case-insensitive query match while leaving unmatched spans unstyled so the
+     * caller's normal enabled/disabled text color still applies. Building a Component before line
+     * wrapping preserves highlight spans across wrapped descriptions and translated labels.
+     */
+    private Component highlightedText(String text, String query) {
+        if (query == null || query.isBlank() || text.isEmpty()) return Component.literal(text);
+        String normalizedText = text.toLowerCase(Locale.ROOT);
+        String normalizedQuery = query.toLowerCase(Locale.ROOT);
+        MutableComponent result = Component.empty();
+        int cursor = 0;
+        int match;
+        while ((match = normalizedText.indexOf(normalizedQuery, cursor)) >= 0) {
+            if (match > cursor) result.append(Component.literal(text.substring(cursor, match)));
+            int end = match + normalizedQuery.length();
+            result.append(Component.literal(text.substring(match, end))
+                    .withStyle(style -> style.withColor(DeckTheme.ACCENT)));
+            cursor = end;
+        }
+        if (cursor < text.length()) result.append(Component.literal(text.substring(cursor)));
+        return result;
     }
 
     private void updateModQuery(String value) {

@@ -81,6 +81,14 @@ public abstract class ConfigOption<T> {
     public final boolean isEnabled() { return enableRequirement.test(); }
     public final boolean isDisplayed() { return displayRequirement.test(); }
     public final List<String> searchAliases() { return List.copyOf(searchAliases); }
+    /** Whether an untyped integration value has a compatible runtime representation for this option. */
+    public final boolean isCompatibleValue(Object candidate) {
+        return candidate != null && isCompatibleValueType(candidate);
+    }
+    /** Validates a prospective typed value without changing draft state or validation UI state. */
+    public final void validateCandidate(T candidate) {
+        validateCandidateValue(candidate, false);
+    }
     public boolean isDirty() { return persistent() && !Objects.equals(draftValue, value); }
     public final boolean canResetDraft() { return !Objects.equals(draftValue, defaultValue()); }
 
@@ -241,12 +249,22 @@ public abstract class ConfigOption<T> {
 
     protected T validate(T value) { return value; }
 
+    /** Custom heterogeneous option types can widen compatibility beyond their default value's class. */
+    protected boolean isCompatibleValueType(Object candidate) {
+        return value.getClass().isInstance(candidate);
+    }
+
     private T validateValue(T candidate) {
+        return validateCandidateValue(candidate, true);
+    }
+
+    private T validateCandidateValue(T candidate, boolean reportError) {
         T validated = validate(Objects.requireNonNull(candidate, "value"));
         ValidationResult result = Objects.requireNonNull(validator.validate(validated), "validator result");
         if (!result.valid()) {
-            validationError = result.error().orElseThrow();
-            throw new IllegalArgumentException(validationError.component().getString());
+            ConfigText error = result.error().orElseThrow();
+            if (reportError) validationError = error;
+            throw new IllegalArgumentException(error.component().getString());
         }
         return validated;
     }

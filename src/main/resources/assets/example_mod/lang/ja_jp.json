@@ -74,6 +74,8 @@
   "example_mod.option.diagnostic_label.desc": "診断機能が有効な場合だけ表示されます。",
   "example_mod.tooltip.enabled": "依存する設定を操作できます。",
   "example_mod.tooltip.disabled": "依存する設定は現在操作できません。",
+  "example_mod.preset.performance": "パフォーマンス",
+  "example_mod.preset.quality": "高品質",
   "example_mod.validation.profile": "プロフィール名を入力してください。",
   "example_mod.validation.even": "偶数を入力してください。",
   "example_mod.validation.list_blank": "空のリスト項目は使用できません。",

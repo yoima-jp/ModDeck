@@ -74,6 +74,8 @@
   "example_mod.option.diagnostic_label.desc": "Visible only when diagnostics are enabled.",
   "example_mod.tooltip.enabled": "Dependent options are currently available.",
   "example_mod.tooltip.disabled": "Dependent options are currently unavailable.",
+  "example_mod.preset.performance": "Performance",
+  "example_mod.preset.quality": "Quality",
   "example_mod.validation.profile": "Enter a profile name.",
   "example_mod.validation.even": "Enter an even number.",
   "example_mod.validation.list_blank": "List entries cannot be blank.",
