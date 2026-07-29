@@ -15,7 +15,7 @@ last_verified_commit: "4790b77de8b5c728d89099e1ac7637c4b99f1b29"
 
 # Complete Example: Full Config with All Option Types
 
-This example is adapted from the actual `ExampleConfig.java` in the repository's `internal.example` package. It exercises every built-in option type, metadata APIs, conditional entries, subcategories, and presets.
+This standalone example exercises every built-in option type, metadata APIs, conditional entries, subcategories, and presets.
 
 ```java
 package com.example.mymod;

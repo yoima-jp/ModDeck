@@ -2,7 +2,6 @@ package com.yoima.moddeck;
 
 import com.yoima.moddeck.api.ConfigScreenApi;
 import com.yoima.moddeck.storage.JsonConfigStorage;
-import com.yoima.moddeck.internal.example.ExampleConfig;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.loader.api.FabricLoader;
 
@@ -14,6 +13,5 @@ public final class ModDeck implements ModInitializer {
         // loads definitions registered earlier by unusual entrypoint ordering.
         ConfigScreenApi.useStorage(new JsonConfigStorage(
                 FabricLoader.getInstance().getConfigDir().resolve(MOD_ID)));
-        ExampleConfig.register();
     }
 }

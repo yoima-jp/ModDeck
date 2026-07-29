@@ -4,7 +4,13 @@
   "version": "${version}",
   "name": "Mod Deck",
   "description": "Declarative, reusable configuration screens for Fabric mods.",
+  "icon": "assets/moddeck/icon.png",
   "authors": ["yoima"],
+  "contact": {
+    "homepage": "https://modrinth.com/project/mod-deck",
+    "sources": "https://github.com/yoima-jp/ModDeck",
+    "issues": "https://github.com/yoima-jp/ModDeck/issues"
+  },
   "license": "MIT",
   "environment": "*",
   "entrypoints": {

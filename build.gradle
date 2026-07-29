@@ -55,6 +55,15 @@ java {
     targetCompatibility = JavaVersion.VERSION_25
 }
 
+jar {
+    // Keep the distributable self-contained: users inspecting only the mod jar must still
+    // receive this project's MIT terms and the notices for bundled font/icon assets.
+    from('LICENSE') {
+        rename { 'LICENSE_moddeck' }
+    }
+    from('THIRD_PARTY_NOTICES.md')
+}
+
 publishing {
     publications {
         create('mavenJava', MavenPublication) {
