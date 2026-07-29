@@ -16,6 +16,16 @@ public final class ConfigScreenApi {
 
     public static void register(ConfigDefinition definition) {
         ConfigRegistry.register(definition);
+        loadStoredValues(definition);
+    }
+
+    /** Rebuilds a definition whose choices depend on current client state. */
+    public static void registerOrReplace(ConfigDefinition definition) {
+        ConfigRegistry.replace(definition);
+        loadStoredValues(definition);
+    }
+
+    private static void loadStoredValues(ConfigDefinition definition) {
         ConfigStorage currentStorage = storage;
         if (currentStorage != null) {
             try {

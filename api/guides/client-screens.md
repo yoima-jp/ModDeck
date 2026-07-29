@@ -26,7 +26,7 @@ Open a ModDeck config screen from client-side code, bypassing the default hub or
 ## Do not use this when
 
 - You are writing common-side code. `ModDeckApi` is in the client source set and cannot be referenced from `src/main/java`.
-- You just want the default hub. Players press `K` (rebindable) to open it.
+- You just want the default hub. Players can assign the optional **Open Mod Deck** shortcut under Controls > Mod Deck.
 
 ## Prerequisites
 

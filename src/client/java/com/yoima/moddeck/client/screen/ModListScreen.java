@@ -397,6 +397,11 @@ public final class ModListScreen extends Screen {
         mouseX /= uiScale;
         mouseY /= uiScale;
         if (listEditorPane != null && listEditorPane.mouseScrolled(mouseX, mouseY, scrollX, scrollY)) return true;
+        // Expanded selector popups with large choice lists own the scroll gesture while open.
+        for (var child : children()) {
+            if (child instanceof ExpandableOptionWidget popup
+                    && popup.handleExpandedScroll(mouseX, mouseY, scrollY)) return true;
+        }
         if (selected != null && selected.categories().size() > 1
                 && mouseX >= categoryTabsX() && mouseX < categoryTabsX() + categoryTabsWidth()
                 && mouseY >= categoryTabsTop && mouseY < categoryTabsTop + 33) {

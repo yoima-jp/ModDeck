@@ -21,6 +21,21 @@ public final class ConfigRegistry {
         }
     }
 
+    /** Replaces the definition owned by the same mod, keeping route lookup consistent. */
+    public static synchronized void replace(ConfigDefinition definition) {
+        Objects.requireNonNull(definition, "definition");
+        ConfigDefinition previous = DEFINITIONS.get(definition.modId());
+        ConfigDefinition routeOwner = ROUTES.get(definition.route());
+        if (routeOwner != null && routeOwner != previous) {
+            throw new IllegalStateException("A config route is already registered: " + definition.route());
+        }
+        if (previous != null) {
+            ROUTES.remove(previous.route(), previous);
+        }
+        DEFINITIONS.put(definition.modId(), definition);
+        ROUTES.put(definition.route(), definition);
+    }
+
     public static Optional<ConfigDefinition> get(String modId) {
         return Optional.ofNullable(DEFINITIONS.get(modId));
     }

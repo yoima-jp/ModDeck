@@ -15,7 +15,7 @@ last_verified_commit: "4790b77de8b5c728d89099e1ac7637c4b99f1b29"
 
 ## Goal
 
-Register a ModDeck config screen from your mod initializer so that players can configure your mod through the Mod Deck hub (press `K` in-game).
+Register a ModDeck config screen from your mod initializer so players can configure your mod through the Mod Deck hub or your own settings entry point.
 
 ## Use this when
 

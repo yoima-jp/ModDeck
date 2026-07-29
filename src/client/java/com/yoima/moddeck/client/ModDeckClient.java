@@ -14,8 +14,10 @@ public final class ModDeckClient implements ClientModInitializer {
     @Override public void onInitializeClient() {
         KeyMapping.Category category = KeyMapping.Category.register(
                 Identifier.fromNamespaceAndPath(ModDeck.MOD_ID, "settings"));
+        // A library mod must not claim a gameplay key by default. Players who want a global hub
+        // shortcut can assign one explicitly in Controls; integrations may open screens directly.
         KeyMapping open = KeyMappingHelper.registerKeyMapping(new KeyMapping(
-                "key.moddeck.open", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_K, category));
+                "key.moddeck.open", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, category));
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             while (open.consumeClick()) {
                 client.setScreenAndShow(new ModListScreen(client.gui.screen()));

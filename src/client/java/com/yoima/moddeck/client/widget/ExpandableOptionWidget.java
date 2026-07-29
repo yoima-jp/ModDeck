@@ -11,4 +11,5 @@ public interface ExpandableOptionWidget {
     void extractPopupRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta);
     default boolean handleExpandedDrag(double mouseX, double mouseY) { return false; }
     default void handleExpandedRelease() {}
+    default boolean handleExpandedScroll(double mouseX, double mouseY, double scrollY) { return false; }
 }
