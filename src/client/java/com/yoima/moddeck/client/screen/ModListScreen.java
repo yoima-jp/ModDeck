@@ -9,6 +9,7 @@ import com.yoima.moddeck.api.storage.ConfigStorage;
 import com.yoima.moddeck.client.theme.DeckFonts;
 import com.yoima.moddeck.client.theme.DeckIcons;
 import com.yoima.moddeck.client.theme.DeckTheme;
+import com.yoima.moddeck.client.theme.ModIconTextures;
 import com.yoima.moddeck.client.screen.ListEditorPane;
 import com.yoima.moddeck.client.screen.layout.ModListLayout;
 import com.yoima.moddeck.client.widget.*;
@@ -372,13 +373,11 @@ public final class ModListScreen extends Screen {
         if (selected != null && selected.categories().size() > 1
                 && mouseY >= categoryTabsTop && mouseY < categoryTabsTop + 32) {
             int tabX = categoryTabsX();
-            int visibleCount = visibleTabCount();
-            for (int visibleIndex = 0; visibleIndex < visibleCount; visibleIndex++) {
+            List<Integer> renderedWidths = renderedTabWidths();
+            for (int visibleIndex = 0; visibleIndex < renderedWidths.size(); visibleIndex++) {
                 int categoryIndex = firstVisibleCategory + visibleIndex;
                 if (categoryIndex >= selected.categories().size()) break;
-                int tabWidth = tabLayout.overflow()
-                        ? Math.min(tabLayout.widths().get(categoryIndex), categoryTabsWidth())
-                        : tabLayout.widths().get(categoryIndex);
+                int tabWidth = renderedWidths.get(visibleIndex);
                 if (mouseX >= tabX && mouseX < tabX + tabWidth) {
                     stopListEditing();
                     activeCategory = categoryIndex;
@@ -489,7 +488,11 @@ public final class ModListScreen extends Screen {
     }
 
     private void drawStaticContent(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
-        DeckTheme.logo(graphics, MARGIN + 5, 11, 28);
+        // The product mark identifies Mod Deck itself; selected-mod icons belong in the sidebar
+        // and detail header where they describe the current configuration owner.
+        if (!ModIconTextures.draw(graphics, "moddeck", MARGIN + 5, 11, 28)) {
+            DeckTheme.logo(graphics, MARGIN + 5, 11, 28);
+        }
         graphics.text(uiFont, "Mod Deck", MARGIN + 41, 16, DeckTheme.TEXT, false);
         graphics.text(uiFont, Component.translatable("moddeck.subtitle"), MARGIN + 41, 29,
                 DeckTheme.TEXT_SECONDARY, false);
@@ -505,13 +508,12 @@ public final class ModListScreen extends Screen {
                     mainX + mainWidth / 2, uiHeight / 2, DeckTheme.TEXT_MUTED);
             return;
         }
-        DeckTheme.modCube(graphics, mainX + 22, mainTop + 15, 38);
+        drawModIcon(graphics, selected.modId(), mainX + 22, mainTop + 15, 38);
         graphics.text(uiFont, fit(selected.titleText().component(),
-                Math.max(80, mainWidth - optionSearchWidth() - 106)), mainX + 72, mainTop + 18, DeckTheme.TEXT, false);
-        graphics.text(uiFont, selected.modId(), mainX + 72, mainTop + 34, DeckTheme.TEXT_SECONDARY, false);
+                Math.max(80, mainWidth - optionSearchWidth() - 106)), mainX + 72, mainTop + 22, DeckTheme.TEXT, false);
         List<FormattedCharSequence> descLines = modDescriptionLines();
         for (int i = 0; i < descLines.size(); i++) {
-            graphics.text(uiFont, descLines.get(i), mainX + 72, mainTop + 51 + i * DESCRIPTION_LINE_HEIGHT,
+            graphics.text(uiFont, descLines.get(i), mainX + 72, mainTop + 40 + i * DESCRIPTION_LINE_HEIGHT,
                     DeckTheme.TEXT_SECONDARY, false);
         }
         drawTabs(graphics);
@@ -543,11 +545,9 @@ public final class ModListScreen extends Screen {
         graphics.enableScissor(MARGIN, 115, MARGIN + sidebarWidth, bottom);
         for (ConfigDefinition definition : filteredDefinitions()) {
             if (y + 42 > bottom) break;
-            DeckTheme.modCube(graphics, MARGIN + 11, y + 7, 28);
+            drawModIcon(graphics, definition.modId(), MARGIN + 11, y + 7, 28);
             graphics.text(uiFont, highlightedText(definition.titleText().component().getString(), modQuery),
-                    MARGIN + 48, y + 10, DeckTheme.TEXT, false);
-            graphics.text(uiFont, highlightedText(definition.modId(), modQuery),
-                    MARGIN + 48, y + 25, DeckTheme.TEXT_SECONDARY, false);
+                    MARGIN + 48, y + 17, DeckTheme.TEXT, false);
             if (definition == selected) DeckIcons.draw(graphics, DeckIcons.Icon.CHEVRON_RIGHT,
                     MARGIN + sidebarWidth - 24, y + 12, 16, DeckTheme.TEXT);
             y += 44;
@@ -559,28 +559,36 @@ public final class ModListScreen extends Screen {
         if (selected == null || selected.categories().size() <= 1) return;
         int tabX = categoryTabsX();
         int tabY = categoryTabsTop + 3;
-        int visibleCount = visibleTabCount();
+        List<Integer> renderedWidths = renderedTabWidths();
         List<Integer> widths = tabLayout.widths();
-        for (int visibleIndex = 0; visibleIndex < visibleCount; visibleIndex++) {
+        if (tabLayout.overflow()) {
+            graphics.enableScissor(categoryTabsX(), categoryTabsTop,
+                    categoryTabsX() + categoryTabsViewportWidth(), categoryTabsTop + 30);
+        }
+        for (int visibleIndex = 0; visibleIndex < renderedWidths.size(); visibleIndex++) {
             int categoryIndex = firstVisibleCategory + visibleIndex;
             if (categoryIndex >= selected.categories().size()) break;
             ConfigCategory category = selected.categories().get(categoryIndex);
             int color = categoryIndex == activeCategory ? DeckTheme.ACCENT : DeckTheme.TEXT_MUTED;
             int naturalWidth = widths.get(categoryIndex);
-            int effectiveWidth = tabLayout.overflow() ? Math.min(naturalWidth, categoryTabsWidth()) : naturalWidth;
+            int effectiveWidth = renderedWidths.get(visibleIndex);
             Component label = category.displayNameText().component();
-            String fitted = (tabLayout.overflow() && effectiveWidth < naturalWidth)
-                    ? fit(label, effectiveWidth - CATEGORY_TAB_HORIZONTAL_PADDING)
-                    : label.getString();
-            Component highlightedLabel = highlightedText(fitted, optionQuery);
+            Component highlightedLabel = highlightedText(label.getString(), optionQuery);
             graphics.text(uiFont, highlightedLabel,
-                    tabX + effectiveWidth / 2 - uiFont.width(highlightedLabel) / 2,
+                    tabX + naturalWidth / 2 - uiFont.width(highlightedLabel) / 2,
                     tabY + 4, color, false);
             if (categoryIndex == activeCategory) {
                 graphics.fill(tabX, categoryTabsTop + 26, tabX + effectiveWidth - 8,
                         categoryTabsTop + 28, DeckTheme.ACCENT);
             }
             tabX += effectiveWidth;
+        }
+        if (tabLayout.overflow()) graphics.disableScissor();
+    }
+
+    private void drawModIcon(GuiGraphicsExtractor graphics, String modId, int x, int y, int size) {
+        if (!ModIconTextures.draw(graphics, modId, x, y, size)) {
+            DeckTheme.modCube(graphics, x, y, size);
         }
     }
 
@@ -842,6 +850,12 @@ public final class ModListScreen extends Screen {
         return tabLayout.overflow()
                 ? ModListLayout.visibleTabCount(tabLayout, firstVisibleCategory, categoryTabsViewportWidth())
                 : selected.categories().size();
+    }
+
+    private List<Integer> renderedTabWidths() {
+        if (!tabLayout.overflow()) return tabLayout.widths();
+        return ModListLayout.renderedTabWidths(tabLayout, firstVisibleCategory,
+                categoryTabsViewportWidth());
     }
 
     private boolean categoriesOverflow() {

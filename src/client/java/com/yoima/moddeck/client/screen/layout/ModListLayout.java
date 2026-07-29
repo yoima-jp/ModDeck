@@ -164,6 +164,25 @@ public final class ModListLayout {
     }
 
     /**
+     * Returns destination widths for every tab that intersects the viewport. The last width may
+     * be smaller than its natural width, allowing the next category to peek into otherwise empty
+     * space while navigation continues to count only fully visible tabs.
+     */
+    public static List<Integer> renderedTabWidths(TabLayout layout, int firstVisible, int viewportWidth) {
+        if (viewportWidth <= 0 || firstVisible < 0 || firstVisible >= layout.widths().size()) {
+            return List.of();
+        }
+        List<Integer> rendered = new ArrayList<>();
+        int remaining = viewportWidth;
+        for (int index = firstVisible; index < layout.widths().size() && remaining > 0; index++) {
+            int width = Math.min(layout.widths().get(index), remaining);
+            rendered.add(width);
+            remaining -= width;
+        }
+        return List.copyOf(rendered);
+    }
+
+    /**
      * Computes per-option row heights from the same wrapped text that drawing uses. The returned
      * list is always the same length as {@code options}; callers can therefore safely index it
      * together with the option list without worrying about mid-frame option list changes.

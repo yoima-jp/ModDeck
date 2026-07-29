@@ -78,6 +78,18 @@ class ModListLayoutTest {
         assertEquals(1, ModListLayout.visibleTabCount(layout, 2, 10));
     }
 
+    @Test void renderedTabWidthsIncludeClippedNextTab() {
+        ModListLayout.TabLayout layout = new ModListLayout.TabLayout(
+                List.of(50, 50, 50), true, 150, 184, 24, 8);
+
+        assertEquals(List.of(50, 50, 20),
+                ModListLayout.renderedTabWidths(layout, 0, 120));
+        assertEquals(List.of(50, 20),
+                ModListLayout.renderedTabWidths(layout, 1, 70));
+        assertEquals(List.of(10),
+                ModListLayout.renderedTabWidths(layout, 2, 10));
+    }
+
     @Test void overflowDecisionUsesFullWidthNotArrowReservedViewport() {
         // Two categories whose natural widths sum to more than the arrow-reserved viewport but
         // still fit the full width. If categoryTabs subtracted arrow space first, it would

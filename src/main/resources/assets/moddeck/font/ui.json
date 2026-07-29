@@ -5,6 +5,10 @@
       "file": "moddeck:noto_sans_jp.ttf",
       "size": 13.0,
       "oversample": 4.0
+    },
+    {
+      "type": "reference",
+      "id": "minecraft:default"
     }
   ]
 }

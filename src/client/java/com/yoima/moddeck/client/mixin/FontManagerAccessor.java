@@ -9,5 +9,5 @@ import org.spongepowered.asm.mixin.gen.Invoker;
 @Mixin(FontManager.class)
 public interface FontManagerAccessor {
     @Invoker("getFontSetRaw")
-    FontSet moddeck$getFontSet(Identifier id);
+    FontSet moddeck$getFontSet(Identifier identifier);
 }

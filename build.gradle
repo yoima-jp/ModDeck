@@ -62,6 +62,46 @@ jar {
         rename { 'LICENSE_moddeck' }
     }
     from('THIRD_PARTY_NOTICES.md')
+
+    // Fabric Loom's splitEnvironmentSourceSets() keeps the client source set out of the
+    // main feature's apiElements/runtimeElements, so composite-build consumers of the
+    // published coordinates only see the common classes. Because ModDeckApi is intentionally
+    // client-only, merge the client output into the distributable jar so dependent mods can
+    // resolve it through the normal project dependency path without exposing a separate variant.
+    // Only include classes that are not already present in the main source set to avoid duplicates.
+    from(sourceSets.client.output.classesDirs) {
+        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    }
+}
+
+// Expose the client source set as an additional outgoing variant. Loom's
+// splitEnvironmentSourceSets() wires the client source set into compile/runtime classpaths
+// internally but does not add it to the java component's consumable variants, so a
+// composite-build consumer cannot request it through apiElements/runtimeElements. Adding a
+// capability-bearing outgoing configuration lets dependent projects request the client
+// classes explicitly without disturbing the main variant or the published Maven artifact.
+configurations {
+    clientElements {
+        canBeConsumed = true
+        canBeResolved = false
+
+        attributes {
+            attribute(Category.CATEGORY_ATTRIBUTE, objects.named(Category, Category.LIBRARY))
+            attribute(Bundling.BUNDLING_ATTRIBUTE, objects.named(Bundling, Bundling.EXTERNAL))
+            attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, 25)
+            attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, objects.named(LibraryElements, LibraryElements.CLASSES))
+            attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage, Usage.JAVA_API))
+        }
+
+        outgoing {
+            capability('com.yoima:moddeck-client-classes:' + version)
+            sourceSets.client.output.classesDirs.files.each { dir ->
+                artifact(dir) {
+                    type = 'java-classes-directory'
+                }
+            }
+        }
+    }
 }
 
 publishing {

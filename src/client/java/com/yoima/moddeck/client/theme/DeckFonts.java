@@ -8,7 +8,7 @@ import net.minecraft.client.gui.font.FontSet;
 import net.minecraft.network.chat.FontDescription;
 import net.minecraft.resources.Identifier;
 
-/** Provides the bundled Noto Sans JP font without replacing Minecraft's global UI font. */
+/** Provides the bundled Noto Sans JP font with Minecraft's configured glyph fallbacks. */
 public final class DeckFonts {
     private static final Identifier UI_FONT = Identifier.fromNamespaceAndPath("moddeck", "ui");
     private static final Font UI = new Font(new Font.Provider() {
