@@ -71,8 +71,14 @@ ConfigScreenApi.register(
 - Fabric API 0.155.2+26.2 or newer
 - Java 25
 
-Add the published `com.yoima:moddeck` artifact and declare `moddeck` as a dependency in your `fabric.mod.json`.
+ModDeck is published on the Modrinth Maven repository (`https://api.modrinth.com/maven`). Add it to your `build.gradle` as `implementation 'maven.modrinth:mod-deck:0.1.0'` (standard `implementation`, never `modImplementation`, because this is a non-obfuscated Fabric 26.2 project) and declare `moddeck` as a dependency in your `fabric.mod.json`. See [Getting Started](guides/getting-started.md) for the full setup.
 
 ## For AI agents
 
 If you are an AI coding agent working with ModDeck, read [AGENTS.md](AGENTS.md) first.
+
+## Links
+
+- Modrinth: <https://modrinth.com/mod/mod-deck>
+- Source: <https://github.com/yoima-jp/ModDeck>
+- Issues: <https://github.com/yoima-jp/ModDeck/issues>

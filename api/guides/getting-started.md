@@ -31,8 +31,48 @@ Register a ModDeck config screen from your mod initializer so players can config
 ## Prerequisites
 
 - Minecraft Java Edition 26.2, Fabric Loader 0.19.3+, Fabric API 0.155.2+26.2, Java 25.
-- The `com.yoima:moddeck` artifact on your mod's classpath.
 - `moddeck` declared as a dependency in your `fabric.mod.json`.
+
+## Add the dependency
+
+ModDeck is published on the Modrinth Maven repository. Add the repository and the artifact to your `build.gradle`. This is a non-obfuscated Fabric 26.2 project, so use the standard Gradle `implementation` configuration — never `modImplementation`.
+
+```gradle
+repositories {
+    maven { url = 'https://api.modrinth.com/maven' }
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+    implementation 'maven.modrinth:mod-deck:0.1.0'
+}
+```
+
+Then declare the dependency in `fabric.mod.json`:
+
+```json
+"depends": {
+  "fabricloader": ">=0.19.3",
+  "minecraft": "~26.2",
+  "java": ">=25",
+  "fabric-api": ">=0.155.2",
+  "moddeck": "*"
+}
+```
+
+### Local source for contributors and snapshot builds
+
+If you are contributing to ModDeck or need an unreleased snapshot, you can compile against the local source via a Gradle composite build instead of pulling the published artifact. Add this to your `settings.gradle`; keep the same `maven.modrinth:mod-deck` coordinate so the substitution is transparent:
+
+```gradle
+includeBuild('../ModDeck') {
+    dependencySubstitution {
+        substitute module('maven.modrinth:mod-deck') using project(':')
+    }
+}
+```
 
 ## Source set
 

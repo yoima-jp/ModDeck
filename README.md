@@ -13,35 +13,20 @@ This is a non-obfuscated Fabric 26.x project using Mojang's official names and `
 
 ## Dependency
 
-There is no hosted Maven artifact yet. During development, depend on the local source via a Gradle composite build so your project compiles against the current ModDeck API without a published jar.
-
-`settings.gradle` (consumer mod):
-
-```gradle
-pluginManagement {
-    repositories {
-        maven { url = 'https://maven.fabricmc.net/' }
-        gradlePluginPortal()
-    }
-}
-
-rootProject.name = 'your_mod'
-
-includeBuild('../ModDeck') {
-    dependencySubstitution {
-        substitute module('com.yoima:moddeck') using project(':')
-    }
-}
-```
+ModDeck is published on Modrinth. Add the Modrinth Maven repository and depend on the published artifact. This is a non-obfuscated Fabric 26.2 project, so use the standard Gradle `implementation` configuration (never `modImplementation`).
 
 `build.gradle` (consumer mod):
 
 ```gradle
+repositories {
+    maven { url = 'https://api.modrinth.com/maven' }
+}
+
 dependencies {
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
     implementation "net.fabricmc:fabric-loader:${project.loader_version}"
     implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
-    implementation 'com.yoima:moddeck:0.1.0'
+    implementation 'maven.modrinth:mod-deck:0.1.0'
 }
 ```
 
@@ -56,6 +41,22 @@ dependencies {
   "moddeck": "*"
 }
 ```
+
+### Local source for contributors and snapshot builds
+
+If you are contributing to ModDeck or need an unreleased snapshot, you can compile against the local source via a Gradle composite build. This is optional and not needed for normal mod development against the published artifact.
+
+`settings.gradle` (consumer mod):
+
+```gradle
+includeBuild('../ModDeck') {
+    dependencySubstitution {
+        substitute module('maven.modrinth:mod-deck') using project(':')
+    }
+}
+```
+
+Keep the `implementation 'maven.modrinth:mod-deck:0.1.0'` line in `build.gradle`; the composite build substitutes it with the local project so the published and local workflows share one coordinate.
 
 ## Minimal registration
 
@@ -200,6 +201,7 @@ The Cloth Config v26.2 feature audit and current parity decisions are documented
 
 ## Links
 
+- Modrinth: <https://modrinth.com/mod/mod-deck>
 - Source: <https://github.com/yoima-jp/ModDeck>
 - Issues: <https://github.com/yoima-jp/ModDeck/issues>
 - License: MIT
