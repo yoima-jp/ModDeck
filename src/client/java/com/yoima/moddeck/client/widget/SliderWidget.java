@@ -1,5 +1,6 @@
 package com.yoima.moddeck.client.widget;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import com.yoima.moddeck.api.option.*;
 import com.yoima.moddeck.client.theme.DeckTheme;
 import com.yoima.moddeck.client.theme.DeckFonts;
@@ -10,7 +11,6 @@ import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
-import org.lwjgl.glfw.GLFW;
 
 /** Purple accent slider with separate range labels and value badge. */
 public final class SliderWidget extends AbstractSliderButton {
@@ -107,17 +107,17 @@ public final class SliderWidget extends AbstractSliderButton {
 
     @Override public boolean keyPressed(KeyEvent event) {
         if (!editing) return super.keyPressed(event);
-        if (event.key() == GLFW.GLFW_KEY_ENTER || event.key() == GLFW.GLFW_KEY_KP_ENTER) {
+        if (event.key() == InputConstants.KEY_RETURN || event.key() == InputConstants.KEY_NUMPADENTER) {
             commitEditing();
             setFocused(false);
             return true;
         }
-        if (event.key() == GLFW.GLFW_KEY_ESCAPE) {
+        if (event.key() == InputConstants.KEY_ESCAPE) {
             editing = false;
             updateMessage();
             return true;
         }
-        if (event.key() == GLFW.GLFW_KEY_BACKSPACE) {
+        if (event.key() == InputConstants.KEY_BACKSPACE) {
             if (replaceOnType) {
                 editingBuffer = "";
                 replaceOnType = false;
@@ -126,7 +126,7 @@ public final class SliderWidget extends AbstractSliderButton {
             }
             return true;
         }
-        if (event.key() == GLFW.GLFW_KEY_A && (event.modifiers() & GLFW.GLFW_MOD_CONTROL) != 0) {
+        if (event.key() == InputConstants.KEY_A && (event.modifiers() & InputConstants.MOD_CONTROL) != 0) {
             replaceOnType = true;
             return true;
         }

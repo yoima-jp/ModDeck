@@ -277,7 +277,7 @@ public final class MyModInitializer implements ModInitializer {
 }
 ```
 
-Minecraft 26.2 supplies Gson on the mod compile and runtime classpaths used by this project.
+Minecraft 26.3 supplies Gson on the mod compile and runtime classpaths used by this project.
 
 ## How it works
 

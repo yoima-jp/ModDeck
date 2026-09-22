@@ -3,6 +3,7 @@ package com.yoima.moddeck.client.widget;
 import com.yoima.moddeck.api.option.ColorOption;
 import com.yoima.moddeck.client.theme.DeckFonts;
 import com.yoima.moddeck.client.theme.DeckTheme;
+import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractWidget;
@@ -11,7 +12,6 @@ import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.network.chat.Component;
-import org.lwjgl.glfw.GLFW;
 
 /** Compact color summary with an in-place Mod Deck hue-wheel popup. */
 public final class ColorFieldWidget extends AbstractWidget implements ExpandableOptionWidget {
@@ -224,7 +224,7 @@ public final class ColorFieldWidget extends AbstractWidget implements Expandable
 
     @Override public boolean keyPressed(KeyEvent event) {
         if (!expanded) return super.keyPressed(event);
-        if (event.key() == GLFW.GLFW_KEY_ESCAPE) {
+        if (event.key() == InputConstants.KEY_ESCAPE) {
             if (editingHex) { editingHex = false; hexBuffer = ""; }
             else if (editingChannel >= 0) editingChannel = -1;
             else expanded = false;
@@ -232,9 +232,9 @@ public final class ColorFieldWidget extends AbstractWidget implements Expandable
         }
         if (editingHex) return hexKeyPressed(event);
         if (editingChannel < 0) return true;
-        if (event.key() == GLFW.GLFW_KEY_ENTER || event.key() == GLFW.GLFW_KEY_KP_ENTER) {
+        if (event.key() == InputConstants.KEY_RETURN || event.key() == InputConstants.KEY_NUMPADENTER) {
             commitChannelEdit();
-        } else if (event.key() == GLFW.GLFW_KEY_BACKSPACE && !editingBuffer.isEmpty()) {
+        } else if (event.key() == InputConstants.KEY_BACKSPACE && !editingBuffer.isEmpty()) {
             editingBuffer = editingBuffer.substring(0, editingBuffer.length() - 1);
         }
         return true;
@@ -250,12 +250,12 @@ public final class ColorFieldWidget extends AbstractWidget implements Expandable
     }
 
     private boolean hexKeyPressed(KeyEvent event) {
-        if (event.key() == GLFW.GLFW_KEY_ENTER || event.key() == GLFW.GLFW_KEY_KP_ENTER) {
+        if (event.key() == InputConstants.KEY_RETURN || event.key() == InputConstants.KEY_NUMPADENTER) {
             commitHexEdit();
             editingHex = false;
             return true;
         }
-        if (event.key() == GLFW.GLFW_KEY_BACKSPACE) {
+        if (event.key() == InputConstants.KEY_BACKSPACE) {
             if (hexReplaceOnType) {
                 hexBuffer = "";
                 hexReplaceOnType = false;
@@ -264,7 +264,7 @@ public final class ColorFieldWidget extends AbstractWidget implements Expandable
             }
             return true;
         }
-        if (event.key() == GLFW.GLFW_KEY_DELETE) {
+        if (event.key() == InputConstants.KEY_DELETE) {
             if (hexReplaceOnType) {
                 hexBuffer = "";
                 hexReplaceOnType = false;
@@ -273,14 +273,14 @@ public final class ColorFieldWidget extends AbstractWidget implements Expandable
             }
             return true;
         }
-        if (event.key() == GLFW.GLFW_KEY_A && (event.modifiers() & GLFW.GLFW_MOD_CONTROL) != 0) {
+        if (event.key() == InputConstants.KEY_A && (event.modifiers() & InputConstants.MOD_CONTROL) != 0) {
             hexReplaceOnType = true;
             return true;
         }
-        if (event.key() == GLFW.GLFW_KEY_HOME) return true;
-        if (event.key() == GLFW.GLFW_KEY_END) return true;
-        int arrow = GLFW.GLFW_KEY_LEFT - event.key();
-        if (arrow == 0 || event.key() == GLFW.GLFW_KEY_RIGHT) {
+        if (event.key() == InputConstants.KEY_HOME) return true;
+        if (event.key() == InputConstants.KEY_END) return true;
+        int arrow = InputConstants.KEY_LEFT - event.key();
+        if (arrow == 0 || event.key() == InputConstants.KEY_RIGHT) {
             // Arrow keys do not move in this single-line hex field; consume them so the
             // parent screen does not try to change focus while the user is mid-edit.
             return true;

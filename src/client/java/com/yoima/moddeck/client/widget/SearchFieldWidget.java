@@ -27,7 +27,7 @@ public final class SearchFieldWidget extends EditBox {
         setBordered(false);
         setTextShadow(false);
         setMaxLength(80);
-        // Minecraft 26.2 renders EditBox hints through an overload that always enables a text
+        // Minecraft 26.3 renders EditBox hints through an overload that always enables a text
         // shadow. That shadow looks like duplicated text on the light palette, so keep the
         // native hint empty and draw the same accessible message ourselves without a shadow.
         setHint(Component.empty());

@@ -10,7 +10,6 @@ import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
-import org.lwjgl.glfw.GLFW;
 
 public final class KeybindWidget extends AbstractWidget {
     private final KeybindOption option;
@@ -37,7 +36,7 @@ public final class KeybindWidget extends AbstractWidget {
 
     public boolean captureKey(KeyEvent event) {
         if (!listening) return false;
-        if (event.key() == GLFW.GLFW_KEY_ESCAPE) {
+        if (event.key() == InputConstants.KEY_ESCAPE) {
             finish(KeybindOption.UNBOUND_KEY);
             return true;
         }
@@ -84,10 +83,10 @@ public final class KeybindWidget extends AbstractWidget {
 
     private static String withModifiers(String key, int modifiers) {
         StringBuilder chord = new StringBuilder();
-        if ((modifiers & GLFW.GLFW_MOD_CONTROL) != 0) chord.append("control+");
-        if ((modifiers & GLFW.GLFW_MOD_SHIFT) != 0) chord.append("shift+");
-        if ((modifiers & GLFW.GLFW_MOD_ALT) != 0) chord.append("alt+");
-        if ((modifiers & GLFW.GLFW_MOD_SUPER) != 0) chord.append("super+");
+        if ((modifiers & InputConstants.MOD_CONTROL) != 0) chord.append("control+");
+        if ((modifiers & InputConstants.MOD_SHIFT) != 0) chord.append("shift+");
+        if ((modifiers & InputConstants.MOD_ALT) != 0) chord.append("alt+");
+        if ((modifiers & InputConstants.MOD_SUPER) != 0) chord.append("super+");
         return chord.append(key).toString();
     }
 

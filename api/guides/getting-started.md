@@ -30,12 +30,12 @@ Register a ModDeck config screen from your mod initializer so players can config
 
 ## Prerequisites
 
-- Minecraft Java Edition 26.2, Fabric Loader 0.19.3+, Fabric API 0.155.2+26.2, Java 25.
+- Minecraft Java Edition 26.3, Fabric Loader 0.19.5+, Fabric API 0.161.0+26.3, Java 25.
 - `moddeck` declared as a dependency in your `fabric.mod.json`.
 
 ## Add the dependency
 
-ModDeck is published on the Modrinth Maven repository. Add the repository and the artifact to your `build.gradle`. This is a non-obfuscated Fabric 26.2 project, so use the standard Gradle `implementation` configuration — never `modImplementation`.
+ModDeck is published on the Modrinth Maven repository. Add the repository and the artifact to your `build.gradle`. This is a non-obfuscated Fabric 26.3 project, so use the standard Gradle `implementation` configuration — never `modImplementation`.
 
 ```gradle
 repositories {
@@ -54,10 +54,10 @@ Then declare the dependency in `fabric.mod.json`:
 
 ```json
 "depends": {
-  "fabricloader": ">=0.19.3",
-  "minecraft": "~26.2",
+  "fabricloader": ">=0.19.5",
+  "minecraft": "~26.3",
   "java": ">=25",
-  "fabric-api": ">=0.155.2",
+  "fabric-api": ">=0.161.0",
   "moddeck": "*"
 }
 ```

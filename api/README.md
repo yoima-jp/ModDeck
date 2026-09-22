@@ -12,7 +12,7 @@ last_verified_commit: "4790b77de8b5c728d89099e1ac7637c4b99f1b29"
 
 # ModDeck API Documentation
 
-ModDeck is a declarative configuration-screen library for Minecraft Java Edition 26.2 and Fabric.
+ModDeck is a declarative configuration-screen library for Minecraft Java Edition 26.3 and Fabric.
 Mods register typed options through the public API; ModDeck generates a consistent screen and
 persists values without requiring each mod to implement Minecraft widgets or file I/O.
 
@@ -66,12 +66,12 @@ ConfigScreenApi.register(
 
 ## Requirements
 
-- Minecraft Java Edition 26.2
-- Fabric Loader 0.19.3 or newer
-- Fabric API 0.155.2+26.2 or newer
+- Minecraft Java Edition 26.3
+- Fabric Loader 0.19.5 or newer
+- Fabric API 0.161.0+26.3 or newer
 - Java 25
 
-ModDeck is published on the Modrinth Maven repository (`https://api.modrinth.com/maven`). Add it to your `build.gradle` as `implementation 'maven.modrinth:mod-deck:0.1.0'` (standard `implementation`, never `modImplementation`, because this is a non-obfuscated Fabric 26.2 project) and declare `moddeck` as a dependency in your `fabric.mod.json`. See [Getting Started](guides/getting-started.md) for the full setup.
+ModDeck is published on the Modrinth Maven repository (`https://api.modrinth.com/maven`). Add it to your `build.gradle` as `implementation 'maven.modrinth:mod-deck:0.1.0'` (standard `implementation`, never `modImplementation`, because this is a non-obfuscated Fabric 26.3 project) and declare `moddeck` as a dependency in your `fabric.mod.json`. See [Getting Started](guides/getting-started.md) for the full setup.
 
 ## For AI agents
 

@@ -1,19 +1,19 @@
 # Mod Deck
 
-Mod Deck is a declarative configuration-screen library for Minecraft Java Edition 26.2 and Fabric. Mods register typed options through the public API; Mod Deck renders a consistent settings screen and persists values without requiring each mod to implement Minecraft widgets or file I/O.
+Mod Deck is a declarative configuration-screen library for Minecraft Java Edition 26.3 and Fabric. Mods register typed options through the public API; Mod Deck renders a consistent settings screen and persists values without requiring each mod to implement Minecraft widgets or file I/O.
 
 This is a non-obfuscated Fabric 26.x project using Mojang's official names and `net.fabricmc.fabric-loom`. Yarn mappings and remap tasks are intentionally absent. Mod Deck does not depend on Cloth Config, Architectury, Auto Config, or any Cloth implementation classes.
 
 ## Requirements
 
-- Minecraft Java Edition 26.2
-- Fabric Loader 0.19.3 or newer
-- Fabric API 0.155.2+26.2 or newer
+- Minecraft Java Edition 26.3
+- Fabric Loader 0.19.5 or newer
+- Fabric API 0.161.0+26.3 or newer
 - Java 25
 
 ## Dependency
 
-ModDeck is published on Modrinth. Add the Modrinth Maven repository and depend on the published artifact. This is a non-obfuscated Fabric 26.2 project, so use the standard Gradle `implementation` configuration (never `modImplementation`).
+ModDeck is published on Modrinth. Add the Modrinth Maven repository and depend on the published artifact. This is a non-obfuscated Fabric 26.3 project, so use the standard Gradle `implementation` configuration (never `modImplementation`).
 
 `build.gradle` (consumer mod):
 
@@ -34,10 +34,10 @@ dependencies {
 
 ```json
 "depends": {
-  "fabricloader": ">=0.19.3",
-  "minecraft": "~26.2",
+  "fabricloader": ">=0.19.5",
+  "minecraft": "~26.3",
   "java": ">=25",
-  "fabric-api": ">=0.155.2",
+  "fabric-api": ">=0.161.0",
   "moddeck": "*"
 }
 ```
@@ -162,7 +162,7 @@ This is suitable for a mod's own settings button, Mod Menu, another settings hub
 
 ## Interface
 
-The hub uses a responsive virtual canvas so Minecraft's automatic GUI scale does not collapse the desktop-style layout. Its native 26.2 GUI rendering includes:
+The hub uses a responsive virtual canvas so Minecraft's automatic GUI scale does not collapse the desktop-style layout. Its native 26.3 GUI rendering includes:
 
 - installed-Mod search in the sidebar and a separate current-Mod settings search
 - highlighted search matches and a preset picker when the selected Mod registers presets

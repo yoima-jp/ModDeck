@@ -33,7 +33,7 @@ public final class TextFieldWidget extends EditBox {
         DeckTheme.border(graphics, getX() - TEXT_INSET, getY(), getWidth() + TEXT_INSET * 2, getHeight(), 5,
                 isFocused() ? DeckTheme.ACCENT_DARK : DeckTheme.DIVIDER,
                 isHoveredOrFocused() ? DeckTheme.FIELD_HOVER : DeckTheme.FIELD);
-        // In 26.2 an unbordered EditBox pins textY to getY(). The visual border is custom, so
+        // In 26.3 an unbordered EditBox pins textY to getY(). The visual border is custom, so
         // translate only the vanilla text/cursor layer to retain the theme and center the line.
         graphics.pose().pushMatrix();
         graphics.pose().translate(0, (getHeight() - 8) / 2.0f);
@@ -42,7 +42,7 @@ public final class TextFieldWidget extends EditBox {
     }
 
     @Override protected void onDrag(MouseButtonEvent event, double dragX, double dragY) {
-        // Vanilla 26.2 clamps a drag at the right edge to the end of the currently visible slice.
+        // Vanilla 26.3 clamps a drag at the right edge to the end of the currently visible slice.
         // Because that position is still considered visible, EditBox does not advance displayPos;
         // left-edge dragging works while right-edge dragging stalls. Explicitly move one codepoint
         // beyond either edge so EditBox#scrollTo updates the viewport symmetrically.
